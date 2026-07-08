@@ -236,6 +236,7 @@
         }
     </style>
     <script>
+    <script>
         let gattServer = null;
         let device = null;
         let recon = false;
@@ -244,7 +245,6 @@
         const svcUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const delay = 15000;
         
-        // 5 Minutes in milliseconds (5 * 60 * 1000)
         const TIME_WINDOW_MS = 300000; 
 
         const UUID_MAX  = "4fafc203-1fb5-459e-8fcc-c5c9c331914b";
@@ -263,9 +263,13 @@
             canvas.height = 100;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. Purge points older than 5 minutes dynamically
-            const now = Date.now();
-            history = history.filter(h => (now - h.t) <= TIME_WINDOW_MS);
+            // ONLY purge old data if actively streaming
+            if (device && device.gatt.connected) {
+                const now = Date.now();
+                history = history.filter(h => 
+                    (now - h.t) <= TIME_WINDOW_MS
+                );
+            }
             
             if (history.length === 0) return;
             
@@ -274,9 +278,11 @@
             let cn = Math.min(...cv) - 1;
             if (cx === cn) { cx += 1; cn -= 1; }
             
-            // Define time axis limits (Strictly 5 min wide window)
-            const startTime = now - TIME_WINDOW_MS;
-            const endTime = now;
+            // Frame bounds reference base timestamp
+            const baseTime = device && device.gatt.connected ? 
+                             Date.now() : history[history.length-1].t;
+                             
+            const startTime = baseTime - TIME_WINDOW_MS;
             
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 1;
@@ -290,10 +296,9 @@
             ctx.lineWidth = 3;
             ctx.beginPath();
             
-            // 2. Plot lines matching exact fractional time placement
             history.forEach((pt, i) => {
-                let timeFraction = (pt.t - startTime) / TIME_WINDOW_MS;
-                let x = timeFraction * (canvas.width - 40) + 10;
+                let fraction = (pt.t - startTime) / TIME_WINDOW_MS;
+                let x = fraction * (canvas.width - 40) + 10;
                 let y = 100 - 15 - ((pt.v - cn) / (cx - cn)) * 70;
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
@@ -301,8 +306,8 @@
             ctx.stroke();
             
             let last = history[history.length - 1];
-            let lastTimeFraction = (last.t - startTime) / TIME_WINDOW_MS;
-            let lx = lastTimeFraction * (canvas.width - 40) + 10;
+            let lastFraction = (last.t - startTime) / TIME_WINDOW_MS;
+            let lx = lastFraction * (canvas.width - 40) + 10;
             let ly = 100 - 15 - ((last.v - cn) / (cx - cn)) * 70;
             
             ctx.fillStyle = '#f43f5e';
@@ -350,7 +355,8 @@
                 btn.innerText = "Connect";
                 btn.className = "hdr-btn ctl-btn";
                 btn.disabled = false;
-                clearDisplay();
+                // Keep history array intact on manual disconnects!
+                drawChart(); 
             }
         }
         
@@ -420,7 +426,7 @@
                 document.getElementById(id).innerText = txt + u;
                 if (isBat) updateBatteryUI(parseFloat(txt));
                 if (isCur) {
-                    // Record point using current precise epoch millisecond
+                    // FIX: Re-stamp the chart timeline on connect
                     history.push({ v: parseFloat(txt), t: Date.now() });
                     drawChart();
                 }
@@ -431,7 +437,6 @@
                     document.getElementById(id).innerText = str + u;
                     if (isBat) updateBatteryUI(parseFloat(str));
                     if (isCur) {
-                        // Record point using current precise epoch millisecond
                         history.push({ v: parseFloat(str), t: Date.now() });
                         drawChart();
                     }
