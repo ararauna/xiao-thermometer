@@ -4,15 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" 
           content="width=device-width, 
-                 initial-scale=1.0">
+                 initial-scale=1.0, 
+                 maximum-scale=1.0, 
+                 user-scalable=no">
     <title>XIAO Telemetry</title>
 </head>
 <body>
 
-    <!-- Connection Top Bar -->
+    <!-- Unified Status Bar Toggles -->
     <div id="statusBar" class="status-bar">
-        <span id="statusText" 
-              class="status-text">
+        <span id="statusText" class="status-text">
             🔴 Disconnected
         </span>
         <button id="toggleBtn" 
@@ -22,13 +23,13 @@
         </button>
     </div>
 
-    <!-- Main Workspace Panel -->
+    <!-- Layout Container Grid Matrix -->
     <div class="dashboard">
         
-        <!-- Left Data Column -->
+        <!-- Left Data Metrics Display -->
         <div class="left-col">
             
-            <!-- Temperature Rows -->
+            <!-- Temperature Output Tri-Row -->
             <div class="temp-row">
                 <div class="card">
                     <div class="label">Max Temp</div>
@@ -44,24 +45,27 @@
                 </div>
             </div>
 
-            <!-- Battery Representation Card -->
+            <!-- Battery Level Indicator Card -->
             <div class="card battery-card">
                 <div class="label">Battery Voltage</div>
                 <div class="val bat-val" id="bat">--.- V</div>
                 <div class="battery-icon">
-                    <div id="batLevel" 
-                         class="battery-level">
-                    </div>
+                    <div id="batLevel" class="battery-level"></div>
                 </div>
             </div>
 
-            <!-- Trend Graph Area -->
-            <div class="card" style="padding: 0.5rem;">
-                <canvas id="ch"></canvas>
+            <!-- Connection Elapsed Timer Display -->
+            <div class="card">
+                <div class="label">Session Elapsed Time</div>
+                <div class="val" 
+                     id="elapsedTime" 
+                     style="color: #a855f7; font-size: 1.6rem;">
+                    00:00:00
+                </div>
             </div>
         </div>
 
-        <!-- Right Command Control Panel -->
+        <!-- Right Side Command Switches Panel -->
         <div class="right-col">
             <button id="resetBtn" 
                     class="action-btn" 
@@ -77,7 +81,7 @@
             </button>
         </div>
     </div>
-    <style>
+        <style>
         body {
             font-family: system-ui, sans-serif;
             background: #111827;
@@ -135,12 +139,6 @@
             border-radius: 12px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             text-align: center;
-        }
-        #ch {
-            width: 100%;
-            height: 100px;
-            background: #0f172a;
-            border-radius: 6px;
         }
         .label {
             font-size: 0.75rem;
@@ -236,16 +234,15 @@
         }
     </style>
     <script>
-    <script>
         let gattServer = null;
         let device = null;
         let recon = false;
-        let history = [];
+        
+        let connectStartTime = null;
+        let timerIntervalId = null;
         
         const svcUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const delay = 15000;
-        
-        const TIME_WINDOW_MS = 300000; 
 
         const UUID_MAX  = "4fafc203-1fb5-459e-8fcc-c5c9c331914b";
         const UUID_CUR  = "4fafc202-1fb5-459e-8fcc-c5c9c331914b";
@@ -254,71 +251,33 @@
         const UUID_RST  = "4fafc205-1fb5-459e-8fcc-c5c9c331914b";
         const UUID_SLP  = "4fafc207-1fb5-459e-8fcc-c5c9c331914b";
         
-        function drawChart() {
-            const canvas = document.getElementById('ch');
-            const ctx = canvas.getContext('2d');
-            const rect = canvas.parentNode.getBoundingClientRect();
+        function updateTimerDisplay() {
+            if (!connectStartTime) return;
+            const elapsedMs = Date.now() - connectStartTime;
             
-            canvas.width = rect.width;
-            canvas.height = 100;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const totalSecs = Math.floor(elapsedMs / 1000);
+            const secs = String(totalSecs % 60).padStart(2, '0');
+            const mins = String(Math.floor(totalSecs / 60) % 60)
+                                .padStart(2, '0');
+            const hrs  = String(Math.floor(totalSecs / 3600))
+                                .padStart(2, '0');
+            
+            document.getElementById('elapsedTime').innerText = 
+                `${hrs}:${mins}:${secs}`;
+        }
 
-            // ONLY purge old data if actively streaming
-            if (device && device.gatt.connected) {
-                const now = Date.now();
-                history = history.filter(h => 
-                    (now - h.t) <= TIME_WINDOW_MS
-                );
+        function startSessionTimer() {
+            stopSessionTimer(); 
+            connectStartTime = Date.now();
+            timerIntervalId = setInterval(updateTimerDisplay, 1000);
+            updateTimerDisplay();
+        }
+
+        function stopSessionTimer() {
+            if (timerIntervalId) {
+                clearInterval(timerIntervalId);
+                timerIntervalId = null;
             }
-            
-            if (history.length === 0) return;
-            
-            let cv = history.map(h => h.v);
-            let cx = Math.max(...cv) + 1;
-            let cn = Math.min(...cv) - 1;
-            if (cx === cn) { cx += 1; cn -= 1; }
-            
-            // Frame bounds reference base timestamp
-            const baseTime = device && device.gatt.connected ? 
-                             Date.now() : history[history.length-1].t;
-                             
-            const startTime = baseTime - TIME_WINDOW_MS;
-            
-            ctx.strokeStyle = '#334155';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            let gy = 100 - 15 - ((cx - 1 - cn) / (cx - cn)) * 70;
-            ctx.moveTo(0, gy);
-            ctx.lineTo(canvas.width, gy);
-            ctx.stroke();
-            
-            ctx.strokeStyle = '#38bdf8';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            
-            history.forEach((pt, i) => {
-                let fraction = (pt.t - startTime) / TIME_WINDOW_MS;
-                let x = fraction * (canvas.width - 40) + 10;
-                let y = 100 - 15 - ((pt.v - cn) / (cx - cn)) * 70;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            });
-            ctx.stroke();
-            
-            let last = history[history.length - 1];
-            let lastFraction = (last.t - startTime) / TIME_WINDOW_MS;
-            let lx = lastFraction * (canvas.width - 40) + 10;
-            let ly = 100 - 15 - ((last.v - cn) / (cx - cn)) * 70;
-            
-            ctx.fillStyle = '#f43f5e';
-            ctx.beginPath();
-            ctx.arc(lx, ly, 4, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            ctx.fillStyle = '#9ca3af';
-            ctx.font = '10px sans-serif';
-            ctx.fillText(last.v.toFixed(1) + '°', 
-                         canvas.width - 25, ly + 3);
         }
         
         function updateBatteryUI(v) {
@@ -342,6 +301,8 @@
             const st = document.getElementById('statusText');
             const btn = document.getElementById('toggleBtn');
             
+            stopSessionTimer(); 
+            
             if (recon) {
                 st.innerText = "🟡 Connection Lost";
                 sb.className = "status-bar reconnecting";
@@ -355,8 +316,7 @@
                 btn.innerText = "Connect";
                 btn.className = "hdr-btn ctl-btn";
                 btn.disabled = false;
-                // Keep history array intact on manual disconnects!
-                drawChart(); 
+                clearDisplay();
             }
         }
         
@@ -377,8 +337,9 @@
             document.getElementById('min').innerText = "--.- °C";
             document.getElementById('bat').innerText = "--.- V";
             document.getElementById('batLevel').style.width = "0%";
-            history = [];
-            drawChart();
+            document.getElementById('elapsedTime').innerText = 
+                "00:00:00";
+            connectStartTime = null;
         }
         
         async function attemptReconnect() {
@@ -406,16 +367,17 @@
             document.getElementById('resetBtn').disabled = false;
             document.getElementById('sleepBtn').disabled = false;
             
+            startSessionTimer();
+            
             await setupNotification(s, UUID_MAX, 'max', ' °C');
-            await setupNotification(s, UUID_CUR, 'cur', ' °C', 
-                                    false, true);
+            await setupNotification(s, UUID_CUR, 'cur', ' °C');
             await setupNotification(s, UUID_MIN, 'min', ' °C');
             await setupNotification(s, UUID_BAT, 'bat', ' V', 
                                     true);
         }
         
         async function setupNotification(svc, uuid, id, u, 
-                                         isBat=false, isCur=false) {
+                                         isBat=false) {
             try {
                 const c = await svc.getCharacteristic(uuid);
                 await c.startNotifications();
@@ -425,21 +387,12 @@
                 
                 document.getElementById(id).innerText = txt + u;
                 if (isBat) updateBatteryUI(parseFloat(txt));
-                if (isCur) {
-                    // FIX: Re-stamp the chart timeline on connect
-                    history.push({ v: parseFloat(txt), t: Date.now() });
-                    drawChart();
-                }
                 
                 c.addEventListener('characteristicvaluechanged', (e) => {
                     let d = e.target.value;
                     const str = new TextDecoder().decode(d);
                     document.getElementById(id).innerText = str + u;
                     if (isBat) updateBatteryUI(parseFloat(str));
-                    if (isCur) {
-                        history.push({ v: parseFloat(str), t: Date.now() });
-                        drawChart();
-                    }
                 });
             } catch (err) {
                 console.error(err);
@@ -474,10 +427,7 @@
                 if (uuid === UUID_SLP) recon = false;
                 
                 await c.writeValue(new TextEncoder().encode('1'));
-                if (uuid === UUID_RST) {
-                    history = [];
-                    drawChart();
-                }
+                if (uuid === UUID_RST) startSessionTimer(); 
             } catch (e) {
                 console.error(e);
             }
@@ -485,12 +435,7 @@
 
         function triggerReset() { writeCommand(UUID_RST); }
         function triggerSleep() { writeCommand(UUID_SLP); }
-        
-        // 3. Keep graph scrolling smoothly even between BLE messages
-        setInterval(() => { if (device && device.gatt.connected) drawChart(); }, 2000);
-        
-        window.addEventListener('resize', drawChart);
-        setTimeout(drawChart, 100);
     </script>
 </body>
 </html>
+
