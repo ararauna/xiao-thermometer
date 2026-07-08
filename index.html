@@ -243,6 +243,9 @@
         
         const svcUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const delay = 15000;
+        
+        // 5 Minutes in milliseconds (5 * 60 * 1000)
+        const TIME_WINDOW_MS = 300000; 
 
         const UUID_MAX  = "4fafc203-1fb5-459e-8fcc-c5c9c331914b";
         const UUID_CUR  = "4fafc202-1fb5-459e-8fcc-c5c9c331914b";
@@ -259,13 +262,21 @@
             canvas.width = rect.width;
             canvas.height = 100;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Purge points older than 5 minutes dynamically
+            const now = Date.now();
+            history = history.filter(h => (now - h.t) <= TIME_WINDOW_MS);
             
-            if (!history.length) return;
+            if (history.length === 0) return;
             
             let cv = history.map(h => h.v);
             let cx = Math.max(...cv) + 1;
             let cn = Math.min(...cv) - 1;
             if (cx === cn) { cx += 1; cn -= 1; }
+            
+            // Define time axis limits (Strictly 5 min wide window)
+            const startTime = now - TIME_WINDOW_MS;
+            const endTime = now;
             
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 1;
@@ -278,8 +289,11 @@
             ctx.strokeStyle = '#38bdf8';
             ctx.lineWidth = 3;
             ctx.beginPath();
+            
+            // 2. Plot lines matching exact fractional time placement
             history.forEach((pt, i) => {
-                let x = (i / 29) * (canvas.width - 40) + 10;
+                let timeFraction = (pt.t - startTime) / TIME_WINDOW_MS;
+                let x = timeFraction * (canvas.width - 40) + 10;
                 let y = 100 - 15 - ((pt.v - cn) / (cx - cn)) * 70;
                 if (i === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
@@ -287,8 +301,8 @@
             ctx.stroke();
             
             let last = history[history.length - 1];
-            let lx = ((history.length - 1) / 29) * 
-                     (canvas.width - 40) + 10;
+            let lastTimeFraction = (last.t - startTime) / TIME_WINDOW_MS;
+            let lx = lastTimeFraction * (canvas.width - 40) + 10;
             let ly = 100 - 15 - ((last.v - cn) / (cx - cn)) * 70;
             
             ctx.fillStyle = '#f43f5e';
@@ -406,8 +420,8 @@
                 document.getElementById(id).innerText = txt + u;
                 if (isBat) updateBatteryUI(parseFloat(txt));
                 if (isCur) {
-                    history.push({ v: parseFloat(txt) });
-                    if (history.length > 30) history.shift();
+                    // Record point using current precise epoch millisecond
+                    history.push({ v: parseFloat(txt), t: Date.now() });
                     drawChart();
                 }
                 
@@ -417,8 +431,8 @@
                     document.getElementById(id).innerText = str + u;
                     if (isBat) updateBatteryUI(parseFloat(str));
                     if (isCur) {
-                        history.push({ v: parseFloat(str) });
-                        if (history.length > 30) history.shift();
+                        // Record point using current precise epoch millisecond
+                        history.push({ v: parseFloat(str), t: Date.now() });
                         drawChart();
                     }
                 });
@@ -466,6 +480,9 @@
 
         function triggerReset() { writeCommand(UUID_RST); }
         function triggerSleep() { writeCommand(UUID_SLP); }
+        
+        // 3. Keep graph scrolling smoothly even between BLE messages
+        setInterval(() => { if (device && device.gatt.connected) drawChart(); }, 2000);
         
         window.addEventListener('resize', drawChart);
         setTimeout(drawChart, 100);
