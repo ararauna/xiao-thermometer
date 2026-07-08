@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XIAO Telemetry</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #111827; color: #f9fafb; margin: 0; padding: 1.5rem; }
+        .status-bar { background: #1f2937; padding: 0.75rem; border-radius: 8px; text-align: center; margin-bottom: 1.5rem; font-weight: bold; border-left: 6px solid #ef4444; transition: all 0.3s; }
+        .status-bar.connected { border-left-color: #10b981; color: #10b981; }
+        .status-bar.reconnecting { border-left-color: #f59e0b; color: #f59e0b; }
+        .dashboard { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; max-width: 800px; margin: 0 auto; }
+        .left-col { display: flex; flex-direction: column; gap: 1.5rem; }
+        .temp-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+        .card { background: #1f2937; padding: 1.25rem 0.75rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; }
+        .label { font-size: 0.85rem; text-transform: uppercase; color: #9ca3af; font-weight: 600; }
+        .val { font-size: 1.5rem; color: #38bdf8; font-weight: bold; margin-top: 0.5rem; }
+        .battery-card { padding: 2rem 1rem; display: flex; flex-direction: column; align-items: center; }
+        .bat-val { font-size: 3.5rem; color: #10b981; margin-top: 0.5rem; transition: color 0.3s; }
+        .battery-icon { width: 80px; height: 40px; border: 3px solid #9ca3af; border-radius: 6px; position: relative; padding: 2px; box-sizing: border-box; margin-top: 1rem; }
+        .battery-icon::after { content: ''; position: absolute; right: -8px; top: 10px; width: 5px; height: 14px; background: #9ca3af; border-radius: 0 3px 3px 0; }
+        .battery-level { height: 100%; width: 0%; background: #10b981; border-radius: 3px; transition: width 0.5s, background-color 0.5s; }
+        .right-col { display: flex; flex-direction: column; gap: 1rem; }
+        button { width: 100%; padding: 14px; font-size: 1rem; border-radius: 8px; cursor: pointer; border: none; font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        button:disabled { background: #374151 !important; color: #9ca3af; cursor: not-allowed; }
+        .ctl-btn { background: #2563eb; color: white; }
+        .action-btn { background: #4b5563; color: white; }
+        .danger-btn { background: #dc2626; color: white; }
+        @media (max-width: 600px) { .dashboard { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div id="statusBar" class="status-bar">🔴 Device Disconnected</div>
+    <div class="dashboard">
+        <div class="left-col">
+            <div class="temp-row">
+                <div class="card"><div class="label">Max Temp</div><div class="val" id="max">--.- °C</div></div>
+                <div class="card"><div class="label">Current</div><div class="val" id="cur">--.- °C</div></div>
+                <div class="card"><div class="label">Min Temp</div><div class="val" id="min">--.- °C</div></div>
+            </div>
+            <div class="card battery-card">
+                <div class="label">Battery Voltage</div>
+                <div class="val bat-val" id="bat">--.- V</div>
+                <div class="battery-icon"><div id="batLevel" class="battery-level"></div></div>
+            </div>
+            <div class="card" style="padding:0.5rem;">
+                <canvas id="ch" style="width:100%;height:120px;background:#0f172a;border-radius:6px;"></canvas>
+            </div>
+
+        </div>
+        <div class="right-col">
+            <button id="connectBtn" class="ctl-btn" onclick="connectBLE()">Connect Device</button>
+            <button id="resetBtn" class="action-btn" onclick="writeCommand('4fafc205-1fb5-459e-8fcc-c5c9c331914b')" disabled>Reset Metrics</button>
+            <button id="sleepBtn" class="danger-btn" onclick="writeCommand('4fafc207-1fb5-459e-8fcc-c5c9c331914b')" disabled>Deep Sleep</button>
+        </div>
+    </div>
+    <script>
+let gattServer=null,device=null,recon=false,history=[];
+const svcUuid="4fafc201-1fb5-459e-8fcc-c5c9c331914b",delay=15000;
+function drawChart(){
+    const c=document.getElementById('ch'),ctx=c.getContext('2d'),r=c.parentNode.getBoundingClientRect();
+    c.width=r.width;c.height=120;ctx.clearRect(0,0,c.width,c.height);if(!history.length)return;
+    let vals=history.map(h=>h.v),max=Math.max(...vals)+1,min=Math.min(...vals)-1;if(max===min){max+=1;min-=1;}
+    ctx.strokeStyle='#334155';ctx.lineWidth=1;ctx.beginPath();
+    ctx.moveTo(0,120-15-((max-1-min)/(max-min))*90);ctx.lineTo(c.width,120-15-((max-1-min)/(max-min))*90);ctx.stroke();
+    ctx.strokeStyle='#38bdf8';ctx.lineWidth=3;ctx.beginPath();
+    history.forEach((pt,i)=>{let x=(i/29)*(c.width-40)+10,y=120-15-((pt.v-min)/(max-min))*90;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+    ctx.stroke();let last=history[history.length-1],lx=((history.length-1)/29)*(c.width-40)+10,ly=120-15-((last.v-min)/(max-min))*90;
+    ctx.fillStyle='#f43f5e';ctx.beginPath();ctx.arc(lx,ly,4,0,2*Math.PI);ctx.fill();
+    ctx.fillStyle='#9ca3af';ctx.font='10px sans-serif';ctx.fillText(last.v.toFixed(1)+'°',c.width-25,ly+3);
+}
+function updateBatteryUI(v){
+    let p=Math.max(0,Math.min(100,Math.round(((v-3.3)/0.9)*100)));
+    const el=document.getElementById('batLevel'),val=document.getElementById('bat');
+    el.style.width=p+'%';el.style.backgroundColor=val.style.color=v>=3.7?'#10b981':(v>=3.45?'#f59e0b':'#ef4444');
+}
+function onDisconnected(){
+    document.getElementById('resetBtn').disabled=document.getElementById('sleepBtn').disabled=true;document.getElementById('connectBtn').disabled=false;
+    if(recon){document.getElementById('statusBar').innerText="🟡 Lost connection. Retry in 15s...";document.getElementById('statusBar').className="status-bar reconnecting";setTimeout(attemptReconnect,delay);}
+    else{document.getElementById('statusBar').innerText="🔴 Device Disconnected";document.getElementById('statusBar').className="status-bar";clearDisplay();}
+}
+function clearDisplay(){
+    document.getElementById('max').innerText=document.getElementById('cur').innerText=document.getElementById('min').innerText="--.- °C";
+    document.getElementById('bat').innerText="--.- V";document.getElementById('batLevel').style.width="0%";history=[];drawChart();
+}
+async function attemptReconnect(){if(!device||!recon)return;try{gattServer=await device.gatt.connect();await startGattOperations();}catch(e){setTimeout(attemptReconnect,delay);}}
+async function startGattOperations(){
+    const svc=await gattServer.getPrimaryService(svcUuid);
+    document.getElementById('statusBar').innerText="🟢 Device Connected";document.getElementById('statusBar').className="status-bar connected";
+    document.getElementById('resetBtn').disabled=document.getElementById('sleepBtn').disabled=false;document.getElementById('connectBtn').disabled=true;
+    await setupNotification(svc,'4fafc203-1fb5-459e-8fcc-c5c9c331914b','max',' °C');
+    await setupNotification(svc,'4fafc202-1fb5-459e-8fcc-c5c9c331914b','cur',' °C',false,true);
+    await setupNotification(svc,'4fafc204-1fb5-459e-8fcc-c5c9c331914b','min',' °C');
+    await setupNotification(svc,'4fafc206-1fb5-459e-8fcc-c5c9c331914b','bat',' V',true);
+}
+async function setupNotification(svc,uuid,id,u,isBat=false,isCur=false){
+    try{
+        const c=await svc.getCharacteristic(uuid);await c.startNotifications();
+        const init=await c.readValue(),txt=new TextDecoder().decode(init);
+        document.getElementById(id).innerText=txt+u;if(isBat)updateBatteryUI(parseFloat(txt));if(isCur){history.push({v:parseFloat(txt)});if(history.length>30)history.shift();drawChart();}
+        c.addEventListener('characteristicvaluechanged',(e)=>{
+            const str=new TextDecoder().decode(e.target.value);document.getElementById(id).innerText=str+u;
+            if(isBat)updateBatteryUI(parseFloat(str));if(isCur){history.push({v:parseFloat(str)});if(history.length>30)history.shift();drawChart();}
+        });
+    }catch(err){console.error(err);}
+}
+async function connectBLE(){
+    try{recon=false;device=await navigator.bluetooth.requestDevice({filters:[{name:'XIAO_C6_Thermometer'}],optionalServices:[svcUuid]});
+        device.addEventListener('gattserverdisconnected',onDisconnected);gattServer=await device.gatt.connect();recon=true;await startGattOperations();
+    }catch(err){alert("Connection failed.");}
+}
+async function writeCommand(uuid){
+    if(!gattServer||!gattServer.connected)return;try{const svc=await gattServer.getPrimaryService(svcUuid),c=await svc.getCharacteristic(uuid);if(uuid==='4fafc207-1fb5-459e-8fcc-c5c9c331914b')recon=false;await c.writeValue(new TextEncoder().encode('1'));if(uuid==='4fafc205-1fb5-459e-8fcc-c5c9c331914b'){history=[];drawChart();}}catch(e){console.error(e);}
+}
+window.addEventListener('resize',drawChart);setTimeout(drawChart,100);
+
+
+    </script>
+</body>
+</html>
