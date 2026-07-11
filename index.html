@@ -63,10 +63,10 @@
  </button> 
  
  <button id="extendBtn" class="action-btn" onclick="triggerExtend()" disabled>
- Extend Session (+2m)
+ Extend Session 
  </button>
 
- <button id="pauseBtn" class="warn-btn" onclick="togglePauseState()" disabled>
+ <button id="pauseBtn" class="action-btn" onclick="togglePauseState()" disabled>
  Pause Session
  </button>
 
@@ -219,15 +219,6 @@
  color: white; 
  width: 100%; 
  } 
- .warn-btn {
- background: #d97706; 
- color: white;
- width: 100%;
- transition: background 0.2s;
- }
- .warn-btn.active-pause {
- background: #2563eb; 
- }
  .danger-btn { 
  background: #dc2626; 
  color: white; 
@@ -359,7 +350,6 @@
  const pBtn = document.getElementById('pauseBtn');
  if(pBtn) {
  pBtn.innerText = "Pause Session";
- pBtn.classList.remove('active-pause');
  }
  } 
  
@@ -467,13 +457,10 @@
  writeCommand(UUID_PSE, '1');
  isPausedState = true;
  btn.innerText = "Resume Session";
- btn.classList.add('active-pause');
  } else {
  writeCommand(UUID_PSE, '0');
  isPausedState = false;
  btn.innerText = "Pause Session";
- btn.classList.remove('active-pause');
  }
  }
 </script>
-
