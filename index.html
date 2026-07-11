@@ -254,7 +254,6 @@
         let timerIntervalId = null;
         let localTimerPaused = false;
         let accumulatedElapsedMs = 0;
-        let pauseStartTimestamp = null;
         
         const svcUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const delay = 15000;
@@ -398,11 +397,9 @@
             document.getElementById('pauseBtn').disabled = false;
             document.getElementById('sleepBtn').disabled = false;
             
-            // Only initiate a brand new timer session if not resuming
             if (!localTimerPaused && accumulatedElapsedMs === 0) {
                 startSessionTimer();
             } else if (localTimerPaused) {
-                // Keep the background interval ticking to update UI text
                 timerIntervalId = setInterval(updateTimerDisplay, 1000);
             } else {
                 connectStartTime = Date.now();
@@ -482,9 +479,18 @@
         function triggerPauseToggle() {
             const btn = document.getElementById('pauseBtn');
             if (!localTimerPaused) {
-                // Change state to PAUSED (Send 1 to firmware)
                 localTimerPaused = true;
                 accumulatedElapsedMs += Date.now() - connectStartTime;
                 btn.innerText = "Resume Timer";
                 writeCommand(UUID_PSE, '1');
             } else {
+                localTimerPaused = false;
+                connectStartTime = Date.now();
+                btn.innerText = "Pause Timer";
+                writeCommand(UUID_PSE, '0');
+            }
+            updateTimerDisplay();
+        }
+    </script>
+</body>
+</html>
