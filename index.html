@@ -8,177 +8,10 @@
                  maximum-scale=1.0, 
                  user-scalable=no">
     <title>XIAO Telemetry</title>
-    <style>
-        /* Lock screen margins and force full-viewport height */
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            width: 100vw;
-            background: #111827;
-            overflow: hidden;
-        }
-        body {
-            font-family: system-ui, sans-serif;
-            color: #f9fafb;
-            box-sizing: border-box;
-            padding: 0.75rem;
-            display: flex;
-            flex-direction: column;
-        }
-        .status-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #1f2937;
-            padding: 0.5rem 0.75rem;
-            border-radius: 8px;
-            margin-bottom: 0.75rem;
-            font-weight: bold;
-            border-left: 6px solid #ef4444;
-            transition: all 0.3s;
-            font-size: 0.9rem;
-            flex-shrink: 0;
-        }
-        .status-bar.connected {
-            border-left-color: #10b981;
-            color: #10b981;
-        }
-        .status-bar.reconnecting {
-            border-left-color: #f59e0b;
-            color: #f59e0b;
-        }
-        .status-text {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        /* Dashboard expands to 100% full width and height */
-        .dashboard {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            width: 100%;
-            flex: 1;
-            min-height: 0;
-            box-sizing: border-box;
-        }
-        .left-col {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            flex: 1;
-            min-height: 0;
-        }
-        .temp-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.5rem;
-            flex-shrink: 0;
-        }
-        .card {
-            background: #1f2937;
-            padding: 0.75rem 0.5rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        
-        /* Proportional growing scales data cards down the page */
-        .battery-card { flex: 2; }
-        .timer-card { flex: 1.2; }
-        
-        .label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            color: #9ca3af;
-            font-weight: 600;
-        }
-        .val {
-            font-size: 1.25rem;
-            color: #38bdf8;
-            font-weight: bold;
-            margin-top: 0.25rem;
-        }
-        .bat-val {
-            font-size: 3rem;
-            color: #10b981;
-            margin-top: 0.25rem;
-            transition: color 0.3s;
-        }
-        .battery-icon {
-            width: 76px;
-            height: 38px;
-            border: 3px solid #9ca3af;
-            border-radius: 6px;
-            position: relative;
-            padding: 2px;
-            box-sizing: border-box;
-            margin-top: 0.5rem;
-        }
-        .battery-icon::after {
-            content: '';
-            position: absolute;
-            right: -8px;
-            top: 9px;
-            width: 5px;
-            height: 14px;
-            background: #9ca3af;
-            border-radius: 0 3px 3px 0;
-        }
-        .battery-level {
-            height: 100%;
-            width: 0%;
-            background: #10b981;
-            border-radius: 2px;
-            transition: width 0.5s;
-        }
-        
-        /* Actions button block sits at the bottom layout boundary */
-        .right-col {
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-            flex-shrink: 0;
-            width: 100%;
-        }
-        button {
-            padding: 11px;
-            font-size: 0.95rem;
-            border-radius: 8px;
-            cursor: pointer;
-            border: none;
-            font-weight: 600;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        button:disabled {
-            background: #374151 !important;
-            color: #9ca3af;
-            cursor: not-allowed;
-        }
-        .hdr-btn {
-            width: auto;
-            padding: 6px 14px;
-            font-size: 0.85rem;
-            border-radius: 6px;
-            color: white;
-        }
-        .ctl-btn { background: #2563eb; }
-        .disc-btn { background: #d97706; }
-        .action-btn { background: #4b5563; color: white; }
-        .danger-btn { background: #dc2626; color: white; }
-    </style>
 </head>
 <body>
 
+    <!-- Unified Top Connection Status Header Bar -->
     <div id="statusBar" class="status-bar">
         <span id="statusText" class="status-text">
             🔴 Disconnected
@@ -190,39 +23,45 @@
         </button>
     </div>
 
+    <!-- Main Container Stacked Vertically Down Page -->
     <div class="dashboard">
-        <div class="left-col">
-            <div class="temp-row">
-                <div class="card">
-                    <div class="label">Max Temp</div>
-                    <div class="val" id="max">--.- °C</div>
-                </div>
-                <div class="card">
-                    <div class="label">Current</div>
-                    <div class="val" id="cur">--.- °C</div>
-                </div>
-                <div class="card">
-                    <div class="label">Min Temp</div>
-                    <div class="val" id="min">--.- °C</div>
-                </div>
+        
+        <!-- Horizontally aligned temperature row elements -->
+        <div class="temp-row">
+            <div class="card">
+                <div class="label">Max Temp</div>
+                <div class="val" id="max">--.- °C</div>
             </div>
-            <div class="card battery-card">
-                <div class="label">Battery Voltage</div>
-                <div class="val bat-val" id="bat">--.- V</div>
-                <div class="battery-icon">
-                    <div id="batLevel" class="battery-level"></div>
-                </div>
+            <div class="card">
+                <div class="label">Current</div>
+                <div class="val" id="cur">--.- °C</div>
             </div>
-            <div class="card timer-card">
-                <div class="label">Session Elapsed Time</div>
-                <div class="val" 
-                     id="elapsedTime" 
-                     style="color: #a855f7; font-size: 1.6rem;">
-                    00:00:00
-                </div>
+            <div class="card">
+                <div class="label">Min Temp</div>
+                <div class="val" id="min">--.- °C</div>
             </div>
         </div>
-        
+
+        <!-- Fixed-height battery voltage tracking module -->
+        <div class="card battery-card">
+            <div class="label">Battery Voltage</div>
+            <div class="val bat-val" id="bat">--.- V</div>
+            <div class="battery-icon">
+                <div id="batLevel" class="battery-level"></div>
+            </div>
+        </div>
+
+        <!-- Fixed-height elapsed duration tracking module -->
+        <div class="card">
+            <div class="label">Session Elapsed Time</div>
+            <div class="val" 
+                 id="elapsedTime" 
+                 style="color: #a855f7; font-size: 1.6rem;">
+                00:00:00
+            </div>
+        </div>
+
+        <!-- Control buttons grouped cleanly at bottom edge -->
         <div class="right-col">
             <button id="resetBtn" 
                     class="action-btn" 
@@ -250,6 +89,99 @@
             </button>
         </div>
     </div>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #111827;
+            color: #f9fafb;
+            margin: 0;
+            padding: 0.75rem;
+            box-sizing: border-box;
+        }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #1f2937;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            font-weight: bold;
+            border-left: 6px solid #ef4444;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .status-bar.connected { border-left-color: #10b981; color: #10b981; }
+        .status-bar.reconnecting { border-left-color: #f59e0b; color: #f59e0b; }
+        .status-text { display: flex; align-items: center; gap: 6px; }
+        
+        /* Dashboard forces 100% full screen width execution path */
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-width: 500px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .temp-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            width: 100%;
+        }
+        .card {
+            background: #1f2937;
+            padding: 0.75rem 0.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .label { font-size: 0.75rem; text-transform: uppercase; color: #9ca3af; font-weight: 600; }
+        .val { font-size: 1.25rem; color: #38bdf8; font-weight: bold; margin-top: 0.25rem; }
+        
+        /* Removed flex stretching parameters to restore natural height */
+        .battery-card {
+            padding: 1.25rem 0.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .bat-val { font-size: 2.5rem; color: #10b981; margin-top: 0.25rem; transition: color 0.3s; }
+        .battery-icon { width: 70px; height: 35px; border: 3px solid #9ca3af; border-radius: 6px; position: relative; padding: 2px; box-sizing: border-box; margin-top: 0.5rem; }
+        .battery-icon::after { content: ''; position: absolute; right: -8px; top: 8px; width: 5px; height: 12px; background: #9ca3af; border-radius: 0 3px 3px 0; }
+        .battery-level { height: 100%; width: 0%; background: #10b981; border-radius: 2px; transition: width 0.5s; }
+        
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            width: 100%;
+        }
+        button {
+            padding: 10px;
+            font-size: 0.95rem;
+            border-radius: 8px;
+            cursor: pointer;
+            border: none;
+            font-weight: 600;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button:disabled { background: #374151 !important; color: #9ca3af; cursor: not-allowed; }
+        .hdr-btn { width: auto; padding: 6px 14px; font-size: 0.85rem; border-radius: 6px; color: white; }
+        .ctl-btn { background: #2563eb; }
+        .disc-btn { background: #d97706; }
+        .action-btn { background: #4b5563; color: white; }
+        .danger-btn { background: #dc2626; color: white; }
+    </style>
+</head>
+<body>
     <script>
         let gattServer = null;
         let device = null;
