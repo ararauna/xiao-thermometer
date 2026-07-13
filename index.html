@@ -8,87 +8,6 @@
                  maximum-scale=1.0, 
                  user-scalable=no">
     <title>XIAO Telemetry</title>
-</head>
-<body>
-
-    <!-- Unified Connection Status Bar Toggles -->
-    <div id="statusBar" class="status-bar">
-        <span id="statusText" class="status-text">
-            🔴 Disconnected
-        </span>
-        <button id="toggleBtn" 
-                class="hdr-btn ctl-btn" 
-                onclick="toggleConnection()">
-            Connect
-        </button>
-    </div>
-
-    <!-- Forced Mobile-First Single Column Grid Layout -->
-    <div class="dashboard">
-        
-        <!-- Temperatures Horizontally Stacked Row -->
-        <div class="temp-row">
-            <div class="card">
-                <div class="label">Max Temp</div>
-                <div class="val" id="max">--.- °C</div>
-            </div>
-            <div class="card">
-                <div class="label">Current</div>
-                <div class="val" id="cur">--.- °C</div>
-            </div>
-            <div class="card">
-                <div class="label">Min Temp</div>
-                <div class="val" id="min">--.- °C</div>
-            </div>
-        </div>
-
-        <!-- Large Battery Level Capacity Matrix Container -->
-        <div class="card battery-card">
-            <div class="label">Battery Voltage</div>
-            <div class="val bat-val" id="bat">--.- V</div>
-            <div class="battery-icon">
-                <div id="batLevel" class="battery-level"></div>
-            </div>
-        </div>
-
-        <!-- Connection Session Elapsed Timing Module -->
-        <div class="card timer-card">
-            <div class="label">Session Elapsed Time</div>
-            <div class="val" 
-                 id="elapsedTime" 
-                 style="color: #a855f7; font-size: 1.8rem;">
-                00:00:00
-            </div>
-        </div>
-
-        <!-- Operational Action Button Triggers -->
-        <div class="actions-group">
-            <button id="resetBtn" 
-                    class="action-btn" 
-                    onclick="triggerReset()" 
-                    disabled>
-                Reset Metrics
-            </button>
-            <button id="extendBtn" 
-                    class="action-btn" 
-                    onclick="triggerExtend()" 
-                    disabled>
-                Extend Session (+2m)
-            </button>
-            <button id="pauseBtn" 
-                    class="action-btn" 
-                    onclick="triggerPauseToggle()" 
-                    disabled>
-                Pause Timer
-            </button>
-            <button id="sleepBtn" 
-                    class="danger-btn" 
-                    onclick="triggerSleep()" 
-                    disabled>
-                Deep Sleep
-            </button>
-        </div>
-    </div>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -241,6 +160,86 @@
             .bat-val { font-size: 2.2rem; }
         }
     </style>
+</head>
+<body>
+
+    <!-- Top Unified Status Header Bar -->
+    <div id="statusBar" class="status-bar">
+        <span id="statusText" class="status-text">
+            🔴 Disconnected
+        </span>
+        <button id="toggleBtn" 
+                class="hdr-btn ctl-btn" 
+                onclick="toggleConnection()">
+            Connect
+        </button>
+    </div>
+
+    <!-- Main Workspace Layout Grid -->
+    <div class="dashboard">
+        <div class="left-col">
+            <!-- Temperature Cards Tri-Row -->
+            <div class="temp-row">
+                <div class="card">
+                    <div class="label">Max Temp</div>
+                    <div class="val" id="max">--.- °C</div>
+                </div>
+                <div class="card">
+                    <div class="label">Current</div>
+                    <div class="val" id="cur">--.- °C</div>
+                </div>
+                <div class="card">
+                    <div class="label">Min Temp</div>
+                    <div class="val" id="min">--.- °C</div>
+                </div>
+            </div>
+            <!-- Large battery container card -->
+            <div class="card battery-card">
+                <div class="label">Battery Voltage</div>
+                <div class="val bat-val" id="bat">--.- V</div>
+                <div class="battery-icon">
+                    <div id="batLevel" class="battery-level"></div>
+                </div>
+            </div>
+            <!-- Session duration timer card -->
+            <div class="card">
+                <div class="label">Session Elapsed Time</div>
+                <div class="val" 
+                     id="elapsedTime" 
+                     style="color: #a855f7; font-size: 1.6rem;">
+                    00:00:00
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right hand configuration panel (with new buttons) -->
+        <div class="right-col">
+            <button id="resetBtn" 
+                    class="action-btn" 
+                    onclick="triggerReset()" 
+                    disabled>
+                Reset Metrics
+            </button>
+            <button id="extendBtn" 
+                    class="action-btn" 
+                    onclick="triggerExtend()" 
+                    disabled>
+                Extend Session (+2m)
+            </button>
+            <button id="pauseBtn" 
+                    class="action-btn" 
+                    onclick="triggerPauseToggle()" 
+                    disabled>
+                Pause Timer
+            </button>
+            <button id="sleepBtn" 
+                    class="danger-btn" 
+                    onclick="triggerSleep()" 
+                    disabled>
+                Deep Sleep
+            </button>
+        </div>
+    </div>
     <script>
         let gattServer = null;
         let device = null;
