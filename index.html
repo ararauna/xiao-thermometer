@@ -127,12 +127,12 @@
         .status-bar.reconnecting { border-left-color: #f59e0b; color: #f59e0b; }
         .status-text { display: flex; align-items: center; gap: 1vw; }
         
-        /* FIX: Max height capped at 94vh to guard against browser clipping */
+        /* DOUBLE FIX: Capped height at 88vh to stay clear of browser docks */
         .dashboard {
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            height: 94vh; 
+            height: 88vh; 
             width: 100%;
             box-sizing: border-box;
         }
@@ -154,9 +154,9 @@
             box-sizing: border-box;
             width: 100%;
         }
-        /* FIX: Scaled battery card height down slightly from 22vh to 19vh */
+        /* DOUBLE FIX: Reduced battery card height slightly from 19vh to 17vh */
         .temp-card { height: 11vh; padding: 0.5vh; }
-        .battery-card { height: 19vh; padding: 1vh; }
+        .battery-card { height: 17vh; padding: 1vh; }
         .timer-card { height: 13vh; padding: 1vh; }
         
         /* Font parameters scale up automatically to match high resolution */
@@ -197,6 +197,7 @@
         .action-btn { background: #4b5563; color: white; }
         .danger-btn { background: #dc2626; color: white; }
     </style>
+
     <script>
         let gattServer = null;
         let device = null;
