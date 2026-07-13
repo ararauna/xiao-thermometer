@@ -43,11 +43,13 @@
             align-items: center;
             gap: 6px;
         }
+        
+        /* FIX: Changed layout default configuration to stacked vertical flow */
         .dashboard {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 1rem;
-            max-width: 800px;
+            max-width: 500px;
             margin: 0 auto;
         }
         .left-col {
@@ -86,7 +88,7 @@
             align-items: center;
         }
         .bat-val {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             color: #10b981;
             margin-top: 0.25rem;
             transition: color 0.3s;
@@ -155,15 +157,10 @@
             color: white;
             width: 100%;
         }
-        @media (max-width: 1080px) {
-            .dashboard { grid-template-columns: 1fr; }
-            .bat-val { font-size: 2.2rem; }
-        }
     </style>
 </head>
 <body>
 
-    <!-- Top Unified Status Header Bar -->
     <div id="statusBar" class="status-bar">
         <span id="statusText" class="status-text">
             🔴 Disconnected
@@ -175,10 +172,8 @@
         </button>
     </div>
 
-    <!-- Main Workspace Layout Grid -->
     <div class="dashboard">
         <div class="left-col">
-            <!-- Temperature Cards Tri-Row -->
             <div class="temp-row">
                 <div class="card">
                     <div class="label">Max Temp</div>
@@ -193,7 +188,6 @@
                     <div class="val" id="min">--.- °C</div>
                 </div>
             </div>
-            <!-- Large battery container card -->
             <div class="card battery-card">
                 <div class="label">Battery Voltage</div>
                 <div class="val bat-val" id="bat">--.- V</div>
@@ -201,7 +195,6 @@
                     <div id="batLevel" class="battery-level"></div>
                 </div>
             </div>
-            <!-- Session duration timer card -->
             <div class="card">
                 <div class="label">Session Elapsed Time</div>
                 <div class="val" 
@@ -212,7 +205,6 @@
             </div>
         </div>
         
-        <!-- Right hand configuration panel (with new buttons) -->
         <div class="right-col">
             <button id="resetBtn" 
                     class="action-btn" 
