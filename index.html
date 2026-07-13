@@ -127,12 +127,12 @@
         .status-bar.reconnecting { border-left-color: #f59e0b; color: #f59e0b; }
         .status-text { display: flex; align-items: center; gap: 1vw; }
         
-        /* Core wrapper splits space vertically across 100% bounds */
+        /* FIX: Max height capped at 94vh to guard against browser clipping */
         .dashboard {
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            flex: 1;
+            height: 94vh; 
             width: 100%;
             box-sizing: border-box;
         }
@@ -154,10 +154,9 @@
             box-sizing: border-box;
             width: 100%;
         }
-        
-        /* Viewport heights map elements cleanly down the screen */
+        /* FIX: Scaled battery card height down slightly from 22vh to 19vh */
         .temp-card { height: 11vh; padding: 0.5vh; }
-        .battery-card { height: 22vh; padding: 1vh; }
+        .battery-card { height: 19vh; padding: 1vh; }
         .timer-card { height: 13vh; padding: 1vh; }
         
         /* Font parameters scale up automatically to match high resolution */
