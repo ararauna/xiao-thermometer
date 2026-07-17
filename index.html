@@ -170,7 +170,7 @@
         .battery-card { height: 15vh; padding: 1vh; }
         .timer-card { height: 13vh; padding: 1vh; }
         
-        /* Font parameters mapping color themes */
+        /* Font parameters mapping requested default color schemes */
         .label {
             font-size: 1.6vh;
             text-transform: uppercase;
@@ -178,22 +178,22 @@
             font-weight: 600;
             letter-spacing: 0.05em;
         }
-        .min-val {
+        .max-val {
             font-size: 3.4vh;
-            color: #4ade80;
+            color: #f87171; /* Default Max: Red */
             font-weight: bold;
             margin-top: 0.5vh;
         }
         .cur-val {
             font-size: 3.4vh;
-            color: #38bdf8;
+            color: #4ade80; /* Default Cur: Green */
             font-weight: bold;
             margin-top: 0.5vh;
             transition: color 0.2s ease;
         }
-        .max-val {
+        .min-val {
             font-size: 3.4vh;
-            color: #f87171;
+            color: #38bdf8; /* Default Min: Blue */
             font-weight: bold;
             margin-top: 0.5vh;
         }
@@ -276,8 +276,8 @@
         }
         .ctl-btn { background: #2563eb; }
         .disc-btn { background: #d97706; }
-        .action-btn { background: #4b5563; color: white; }
-        .danger-btn { background: #dc2626; color: white; }
+        .action-btn { background: #4b5563; color: white; width: 100%; }
+        .danger-btn { background: #dc2626; color: white; width: 100%; }
     </style>
     <script>
         let gattServer = null;
@@ -347,11 +347,11 @@
             if (!curEl || lastKnownTemps.cur === null) return;
             
             if (lastKnownTemps.cur === lastKnownTemps.max) {
-                curEl.style.color = "#f87171"; // Match Max Red
+                curEl.style.color = "#f87171"; // Match Max: Red
             } else if (lastKnownTemps.cur === lastKnownTemps.min) {
-                curEl.style.color = "#4ade80"; // Match Min Green
+                curEl.style.color = "#38bdf8"; // Match Min: Blue
             } else {
-                curEl.style.color = ""; // Fall back to CSS default Blue
+                curEl.style.color = "#4ade80"; // Default: Green
             }
         }
         
