@@ -338,15 +338,28 @@
         }
         
         function updateBatteryUI(v) {
-            let num = ((v - 3.3) / 0.9) * 100;
+            // Check for extreme low voltage to force immediate sleep
+            if (v <= 3.1) {
+                console.warn("Critical Battery Voltage (<=3.1V)! Sleeping.");
+                triggerSleep();
+                return;
+            }
+
+            // Normal linear capacity scaling display calculations
+            let num = ((v - 3.1) / 1.1) * 100;
             let p = Math.max(0, Math.min(100, Math.round(num)));
             const el = document.getElementById('batLevel');
             const val = document.getElementById('bat');
             
             el.style.width = p + '%';
-            let col = '#ef4444';
-            if (v >= 3.7) col = '#10b981';
-            else if (v >= 3.45) col = '#f59e0b';
+            
+            // Map your specified warning color thresholds
+            let col = '#ef4444'; // Red default (<= 3.4V)
+            if (v > 3.65) {
+                col = '#10b981'; // Green flag threshold
+            } else if (v > 3.40) {
+                col = '#f59e0b'; // Orange flag threshold
+            }
             el.style.backgroundColor = val.style.color = col;
         }
         
@@ -438,7 +451,6 @@
                 timerIntervalId = setInterval(updateTimerDisplay, 1000);
             }
             
-            // Format incoming values to 1 decimal place on baseline load
             await setupNotification(s, UUID_MAX, 'max', ' °C', false, true);
             await setupNotification(s, UUID_CUR, 'cur', ' °C', false, true);
             await setupNotification(s, UUID_MIN, 'min', ' °C', false, true);
@@ -454,7 +466,6 @@
                 const init = await c.readValue();
                 let txt = new TextDecoder().decode(init);
                 
-                // Parse and apply native 1-decimal rounding limit mechanics
                 if (isTemp && !isNaN(parseFloat(txt))) {
                     txt = parseFloat(txt).toFixed(1);
                 }
