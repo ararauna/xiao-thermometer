@@ -189,6 +189,7 @@
             color: #38bdf8;
             font-weight: bold;
             margin-top: 0.5vh;
+            transition: color 0.2s ease;
         }
         .max-val {
             font-size: 3.4vh;
@@ -288,6 +289,9 @@
         let localTimerPaused = false;
         let accumulatedElapsedMs = 0;
         
+        // Cache to store the latest raw numerical temperature states
+        let lastKnownTemps = { max: null, cur: null, min: null };
+        
         const svcUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const delay = 15000;
 
@@ -337,15 +341,27 @@
             }
         }
         
+        // Handles conditional matching for cur-val text colors
+        function evaluateCurrentTempColor() {
+            const curEl = document.getElementById('cur');
+            if (!curEl || lastKnownTemps.cur === null) return;
+            
+            if (lastKnownTemps.cur === lastKnownTemps.max) {
+                curEl.style.color = "#f87171"; // Match Max Red
+            } else if (lastKnownTemps.cur === lastKnownTemps.min) {
+                curEl.style.color = "#4ade80"; // Match Min Green
+            } else {
+                curEl.style.color = ""; // Fall back to CSS default Blue
+            }
+        }
+        
         function updateBatteryUI(v) {
-            // Check for extreme low voltage to force immediate sleep
             if (v <= 3.1) {
                 console.warn("Critical Battery Voltage (<=3.1V)! Sleeping.");
                 triggerSleep();
                 return;
             }
 
-            // Normal linear capacity scaling display calculations
             let num = ((v - 3.1) / 1.1) * 100;
             let p = Math.max(0, Math.min(100, Math.round(num)));
             const el = document.getElementById('batLevel');
@@ -353,12 +369,11 @@
             
             el.style.width = p + '%';
             
-            // Map your specified warning color thresholds
-            let col = '#ef4444'; // Red default (<= 3.4V)
+            let col = '#ef4444'; 
             if (v > 3.65) {
-                col = '#10b981'; // Green flag threshold
+                col = '#10b981'; 
             } else if (v > 3.40) {
-                col = '#f59e0b'; // Orange flag threshold
+                col = '#f59e0b'; 
             }
             el.style.backgroundColor = val.style.color = col;
         }
@@ -405,6 +420,7 @@
         function clearDisplay() {
             document.getElementById('max').innerText = "--.- °C";
             document.getElementById('cur').innerText = "--.- °C";
+            document.getElementById('cur').style.color = "";
             document.getElementById('min').innerText = "--.- °C";
             document.getElementById('bat').innerText = "--.- V";
             document.getElementById('batLevel').style.width = "0%";
@@ -413,6 +429,7 @@
             connectStartTime = null;
             accumulatedElapsedMs = 0;
             localTimerPaused = false;
+            lastKnownTemps = { max: null, cur: null, min: null };
         }
         
         async function attemptReconnect() {
@@ -451,14 +468,13 @@
                 timerIntervalId = setInterval(updateTimerDisplay, 1000);
             }
             
-            await setupNotification(s, UUID_MAX, 'max', ' °C', false, true);
-            await setupNotification(s, UUID_CUR, 'cur', ' °C', false, true);
-            await setupNotification(s, UUID_MIN, 'min', ' °C', false, true);
-            await setupNotification(s, UUID_BAT, 'bat', ' V', true, false);
+            await setupNotification(s, UUID_MAX, 'max', ' °C', 'max');
+            await setupNotification(s, UUID_CUR, 'cur', ' °C', 'cur');
+            await setupNotification(s, UUID_MIN, 'min', ' °C', 'min');
+            await setupNotification(s, UUID_BAT, 'bat', ' V', 'bat');
         }
         
-        async function setupNotification(svc, uuid, id, u, 
-                                         isBat=false, isTemp=false) {
+        async function setupNotification(svc, uuid, id, u, metricKey) {
             try {
                 const c = await svc.getCharacteristic(uuid);
                 await c.startNotifications();
@@ -466,23 +482,29 @@
                 const init = await c.readValue();
                 let txt = new TextDecoder().decode(init);
                 
-                if (isTemp && !isNaN(parseFloat(txt))) {
-                    txt = parseFloat(txt).toFixed(1);
+                if (metricKey !== 'bat' && !isNaN(parseFloat(txt))) {
+                    let parsedNum = parseFloat(txt);
+                    lastKnownTemps[metricKey] = parseFloat(parsedNum.toFixed(1));
+                    txt = parsedNum.toFixed(1);
                 }
                 
                 document.getElementById(id).innerText = txt + u;
-                if (isBat) updateBatteryUI(parseFloat(txt));
+                if (metricKey === 'bat') updateBatteryUI(parseFloat(txt));
+                evaluateCurrentTempColor();
                 
                 c.addEventListener('characteristicvaluechanged', (e) => {
                     let d = e.target.value;
                     let str = new TextDecoder().decode(d);
                     
-                    if (isTemp && !isNaN(parseFloat(str))) {
-                        str = parseFloat(str).toFixed(1);
+                    if (metricKey !== 'bat' && !isNaN(parseFloat(str))) {
+                        let parsedNum = parseFloat(str);
+                        lastKnownTemps[metricKey] = parseFloat(parsedNum.toFixed(1));
+                        str = parsedNum.toFixed(1);
                     }
                     
                     document.getElementById(id).innerText = str + u;
-                    if (isBat) updateBatteryUI(parseFloat(str));
+                    if (metricKey === 'bat') updateBatteryUI(parseFloat(str));
+                    evaluateCurrentTempColor();
                 });
             } catch (err) {
                 console.error(err);
