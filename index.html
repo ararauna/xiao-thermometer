@@ -438,28 +438,38 @@
                 timerIntervalId = setInterval(updateTimerDisplay, 1000);
             }
             
-            await setupNotification(s, UUID_MAX, 'max', ' °C');
-            await setupNotification(s, UUID_CUR, 'cur', ' °C');
-            await setupNotification(s, UUID_MIN, 'min', ' °C');
-            await setupNotification(s, UUID_BAT, 'bat', ' V', 
-                                    true);
+            // Format incoming values to 1 decimal place on baseline load
+            await setupNotification(s, UUID_MAX, 'max', ' °C', false, true);
+            await setupNotification(s, UUID_CUR, 'cur', ' °C', false, true);
+            await setupNotification(s, UUID_MIN, 'min', ' °C', false, true);
+            await setupNotification(s, UUID_BAT, 'bat', ' V', true, false);
         }
         
         async function setupNotification(svc, uuid, id, u, 
-                                         isBat=false) {
+                                         isBat=false, isTemp=false) {
             try {
                 const c = await svc.getCharacteristic(uuid);
                 await c.startNotifications();
                 
                 const init = await c.readValue();
-                const txt = new TextDecoder().decode(init);
+                let txt = new TextDecoder().decode(init);
+                
+                // Parse and apply native 1-decimal rounding limit mechanics
+                if (isTemp && !isNaN(parseFloat(txt))) {
+                    txt = parseFloat(txt).toFixed(1);
+                }
                 
                 document.getElementById(id).innerText = txt + u;
                 if (isBat) updateBatteryUI(parseFloat(txt));
                 
                 c.addEventListener('characteristicvaluechanged', (e) => {
                     let d = e.target.value;
-                    const str = new TextDecoder().decode(d);
+                    let str = new TextDecoder().decode(d);
+                    
+                    if (isTemp && !isNaN(parseFloat(str))) {
+                        str = parseFloat(str).toFixed(1);
+                    }
+                    
                     document.getElementById(id).innerText = str + u;
                     if (isBat) updateBatteryUI(parseFloat(str));
                 });
