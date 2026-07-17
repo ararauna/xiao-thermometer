@@ -30,15 +30,15 @@
         <div class="temp-row">
             <div class="card temp-card">
                 <div class="label">Max Temp</div>
-                <div class="val" id="max">--.- °C</div>
+                <div class="max-val" id="max">--.- °C</div>
             </div>
             <div class="card temp-card">
                 <div class="label">Current</div>
-                <div class="val" id="cur">--.- °C</div>
+                <div class="cur-val" id="cur">--.- °C</div>
             </div>
             <div class="card temp-card">
                 <div class="label">Min Temp</div>
-                <div class="val" id="min">--.- °C</div>
+                <div class="min-val" id="min">--.- °C</div>
             </div>
         </div>
 
@@ -161,7 +161,9 @@
         
         /* Font parameters scale up automatically to match high resolution */
         .label { font-size: 1.6vh; text-transform: uppercase; color: #9ca3af; font-weight: 600; letter-spacing: 0.05em; }
-        .val { font-size: 3.4vh; color: #38bdf8; font-weight: bold; margin-top: 0.5vh; }
+        .min-val { font-size: 3.4vh; color: #4ade80; font-weight: bold; margin-top: 0.5vh; }
+        .cur-val { font-size: 3.4vh; color: #38bdf8; font-weight: bold; margin-top: 0.5vh; }
+        .max-val { font-size: 3.4vh; color: #f87171; font-weight: bold; margin-top: 0.5vh; }
         .bat-val { font-size: 2.4vh; color: #10b981; font-weight: bold; margin-top: 0.5vh; transition: color 0.3s; }
         .timer-val { color: #a855f7; font-size: 2.4vh; font-weight: bold; margin-top: 0.5vh; }
         
