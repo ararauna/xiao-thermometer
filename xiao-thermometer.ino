@@ -5,8 +5,8 @@
 #include <BLEServer.h>
 #include <BLE2901.h> 
 #include <esp_sleep.h>
-#include <esp_pm.h> 
 
+// Global BLE Configuration Definitions
 #define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
 #define CHAR_CURR_TEMP_UUID "4fafc202-1fb5-459e-8fcc-c5c9c331914b"
 #define CHAR_MAX_TEMP_UUID  "4fafc203-1fb5-459e-8fcc-c5c9c331914b"
@@ -17,11 +17,12 @@
 #define CHAR_EXTEND_UUID    "4fafc208-1fb5-459e-8fcc-c5c9c331914b" 
 #define CHAR_PAUSE_UUID     "4fafc209-1fb5-459e-8fcc-c5c9c331914b" 
 
-#define REED_PIN  1  
-#define VBAT_PIN  0  
-#define GATE_PIN  22 
-#define POWER_PIN 23 
-#define DATA_PIN  21 
+// Hardware GPIO Architecture Matrix
+#define REED_PIN  1  // Physical D1 (Raw GPIO 1) -> Reed Switch Wake/Sleep Line
+#define VBAT_PIN  0  // Physical D0 (Raw GPIO 0) -> Battery ADC Input
+#define GATE_PIN  22 // Physical D4 (Raw GPIO 22) -> BAT_ADC_CONTROL Switch Rail
+#define POWER_PIN 23 // Physical D5 (Raw GPIO 23) -> Dedicated Temp Probe VCC Rail
+#define DATA_PIN  21 // Physical D3 (Raw GPIO 21) -> 1-Wire Data Line
 
 OneWire oneWire(DATA_PIN);
 DallasTemperature sensors(&oneWire);
@@ -40,13 +41,8 @@ bool resetRequested = false;
 bool terminateSession = false; 
 bool extendRequested = false; 
 bool deviceConnected = false; 
-bool initialHandshakeCompleted = false; 
 
-// Non-Blocking Sensor State Machine variables
-enum TempState { IDLE_STATE, REQUESTED_STATE };
-TempState currentTempState = IDLE_STATE;
-unsigned long tempRequestTimestamp = 0;
-
+// Timer Control Variables
 bool timerSuspended = false; 
 unsigned long sessionStartTime = 0;
 unsigned long lastSampleTime = 0;
@@ -54,15 +50,13 @@ unsigned long lastBatterySampleTime = 0;
 unsigned long lastSuspendUpdate = 0; 
 const unsigned long SAMPLE_INTERVAL = 10000; 
 const unsigned long BATTERY_INTERVAL = 30000; 
-unsigned long sessionDuration = 180000; 
+unsigned long sessionDuration = 180000; // Base execution time: 3 minutes
 class DeviceServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
-    pServer->updateConnParams(pServer->getConnId(), 80, 160, 1, 600);
   }
   void onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
-    initialHandshakeCompleted = false;
     BLEDevice::startAdvertising(); 
   }
 };
@@ -94,13 +88,12 @@ void addLabel(BLECharacteristic* pChar, const char* labelText) {
 
 void resetTracking() {
   maxTemp = -999.0; minTemp = 999.0; resetRequested = false;
-  
   pinMode(DATA_PIN, OUTPUT);
   digitalWrite(POWER_PIN, HIGH);
   delay(10);
   
   sensors.requestTemperatures();
-  delay(750); // Kept strictly here for manual triggers where blocking is acceptable
+  delay(750); 
   
   float newTemp = sensors.getTempCByIndex(0);
   if (newTemp != DEVICE_DISCONNECTED_C && newTemp > -50.0) {
@@ -139,11 +132,6 @@ float readBatteryPhysical() {
   return ((adcTotal / 3.0) / 1000.0) * 2.0;
 }
 void setup() {
-  const uint8_t unusedPins[] = {2, 19, 20, 9, 8, 3};
-  for (uint8_t i = 0; i < 6; i++) {
-    pinMode(unusedPins[i], INPUT_PULLUP);
-  }
-
   pinMode(REED_PIN, INPUT_PULLUP);
   delay(50); 
   
@@ -154,10 +142,19 @@ void setup() {
   delay(100); 
   
   sensors.begin();
-  sensors.setWaitForConversion(false); // CRITICAL: Stop sensor from blocking the CPU execution thread
   analogReadResolution(12);
-  batteryVoltage = readBatteryPhysical();
   
+  batteryVoltage = readBatteryPhysical();
+  digitalWrite(POWER_PIN, HIGH);
+  delay(10);
+  sensors.requestTemperatures();
+  delay(750); 
+  float initTemp = sensors.getTempCByIndex(0);
+  if (initTemp != DEVICE_DISCONNECTED_C && initTemp > -50.0) {
+    currentTemp = initTemp; maxTemp = initTemp; minTemp = initTemp;
+  }
+
+  // Pure, raw original Bluetooth configuration initialization
   BLEDevice::init("XIAO_C6_Thermometer");
   BLEServer *pServer = BLEDevice::createServer(); 
   pServer->setCallbacks(new DeviceServerCallbacks());
@@ -182,25 +179,16 @@ void setup() {
   addLabel(pResetChar, "Write 1 to Reset Metrics"); addLabel(pTermChar, "Write 1 to Sleep Device");
   addLabel(pExtendChar, "Write 1 to Add 2 Mins to Session"); addLabel(pPauseChar, "Write 1 to Pause Timer, 0 to Resume");
   
-  // Set accurate baseline on startup before running BLE loops
-  digitalWrite(POWER_PIN, HIGH);
-  delay(10);
-  sensors.requestTemperatures();
-  delay(750); // Visual alignment buffer acceptable only inside setup()
-  float initTemp = sensors.getTempCByIndex(0);
-  if (initTemp != DEVICE_DISCONNECTED_C && initTemp > -50.0) {
-    currentTemp = initTemp; maxTemp = initTemp; minTemp = initTemp;
-    pCurrChar->setValue(String(currentTemp, 2).c_str());
-    pMaxChar->setValue(String(maxTemp, 2).c_str());
-    pMinChar->setValue(String(minTemp, 2).c_str());
-  }
-
+  pCurrChar->setValue(String(currentTemp, 2).c_str());
+  pMaxChar->setValue(String(maxTemp, 2).c_str());
+  pMinChar->setValue(String(minTemp, 2).c_str());
   pBatChar->setValue(String(batteryVoltage, 2).c_str());
   pService->start();
   
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(true);
+  pAdvertising->setScanResponse(true); 
+  
   BLEDevice::startAdvertising();
 
   sessionStartTime = millis();
@@ -211,34 +199,6 @@ void setup() {
 
 void loop() {
   unsigned long currentMillis = millis();
-  static unsigned long connectionTime = 0;
-  static bool pmConfigured = false;
-
-  if (deviceConnected && connectionTime == 0) {
-    connectionTime = currentMillis;
-  }
-
-  // Complete initial handshake 5 seconds after connection
-  if (deviceConnected && !initialHandshakeCompleted && (currentMillis - connectionTime >= 5000)) {
-    initialHandshakeCompleted = true; 
-  }
-
-  // Engage power management safely only after initial discovery is 100% complete
-  if (deviceConnected && initialHandshakeCompleted && !pmConfigured) {
-    pmConfigured = true;
-    esp_pm_config_t pm_config = { .max_freq_mhz = 160, .min_freq_mhz = 40, .light_sleep_enable = true };
-    esp_pm_configure(&pm_config);
-  }
-  
-  if (!deviceConnected) {
-    connectionTime = 0;
-    initialHandshakeCompleted = false;
-    if (pmConfigured) {
-      pmConfigured = false;
-      esp_pm_config_t pm_disable = { .max_freq_mhz = 160, .min_freq_mhz = 160, .light_sleep_enable = false };
-      esp_pm_configure(&pm_disable);
-    }
-  }
 
   if (digitalRead(REED_PIN) == LOW) {
     delay(50); 
@@ -256,22 +216,17 @@ void loop() {
   if (currentMillis - sessionStartTime >= sessionDuration) enterUltraLowPowerSleep();
   if (resetRequested) resetTracking();
 
-  // 1. Non-Blocking Temperature Processing State Machine
-  if (currentTempState == IDLE_STATE && (currentMillis - lastSampleTime >= SAMPLE_INTERVAL)) {
+  // 1. Temperature Processing Loop (Runs every 10 seconds)
+  if (currentMillis - lastSampleTime >= SAMPLE_INTERVAL) {
     lastSampleTime = currentMillis;
     pinMode(DATA_PIN, OUTPUT);
     digitalWrite(POWER_PIN, HIGH);
-    delay(5);
+    delay(5); 
     
-    sensors.requestTemperatures(); // Starts conversion immediately without waiting
-    tempRequestTimestamp = currentMillis;
-    currentTempState = REQUESTED_STATE;
-  }
-
-  if (currentTempState == REQUESTED_STATE && (currentMillis - tempRequestTimestamp >= 750)) {
+    sensors.requestTemperatures();
+    delay(750); // Restored standard blocking safety window
+    
     float newTemp = sensors.getTempCByIndex(0);
-    currentTempState = IDLE_STATE; // Reset state machine structure
-    
     if (newTemp != DEVICE_DISCONNECTED_C && newTemp > -50.0) {
       if (newTemp != currentTemp) {
         currentTemp = newTemp;
@@ -295,9 +250,12 @@ void loop() {
   if (currentMillis - lastBatterySampleTime >= BATTERY_INTERVAL) {
     lastBatterySampleTime = currentMillis;
     batteryVoltage = readBatteryPhysical();
-    pBatChar->setValue(String(batteryVoltage, 2).c_str());
-    if (deviceConnected) pBatChar->notify(); 
+    if (deviceConnected) {
+      pBatChar->setValue(String(batteryVoltage, 2).c_str());
+      pBatChar->notify(); 
+    }
   }
 
-  delay(15); 
+  // Safe standard delay: gives the core stable operating execution without automatic downclocking bugs
+  delay(10); 
 }
