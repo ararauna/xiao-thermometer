@@ -1,571 +1,238 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" 
-          content="width=device-width, 
-                 initial-scale=1.0, 
-                 maximum-scale=1.0, 
-                 user-scalable=no">
-    <title>XIAO Telemetry</title>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+ <title>XIAO Telemetry</title>
 </head>
 <body>
-
-    <!-- Unified Connection Status Bar Toggles -->
-    <div id="statusBar" class="status-bar">
-        <span id="statusText" class="status-text">
-            🔴 Disconnected
-        </span>
-        <button id="toggleBtn" 
-                class="hdr-btn ctl-btn" 
-                onclick="toggleConnection()">
-            Connect
-        </button>
-    </div>
-
-    <!-- Viewport Scaled Mobile Dashboard Enclosure -->
-    <div class="dashboard">
-        
-        <!-- Temperatures Horizontally Stacked Row -->
-        <div class="temp-row">
-            <div class="card temp-card">
-                <div class="label">Max Temp</div>
-                <div class="max-val" id="max">--.- °C</div>
-            </div>
-            <div class="card temp-card">
-                <div class="label">Current</div>
-                <div class="cur-val" id="cur">--.- °C</div>
-            </div>
-            <div class="card temp-card">
-                <div class="label">Min Temp</div>
-                <div class="min-val" id="min">--.- °C</div>
-            </div>
-        </div>
-
-        <!-- Large Battery Sized Tracking Card Container -->
-        <div class="card battery-card">
-            <div class="label">Battery Voltage</div>
-            <div class="val bat-val" id="bat">--.- V</div>
-            <div class="battery-icon">
-                <div id="batLevel" class="battery-level"></div>
-            </div>
-        </div>
-
-        <!-- Connection Session Duration Module -->
-        <div class="card timer-card">
-            <div class="label">Session Elapsed Time</div>
-            <div class="val timer-val" id="elapsedTime">
-                00:00:00
-            </div>
-        </div>
-
-        <!-- Operational Action Button Triggers Panel -->
-        <div class="actions-group">
-            <button id="resetBtn" 
-                    class="action-btn" 
-                    onclick="triggerReset()" 
-                    disabled>
-                Reset Metrics
-            </button>
-            <button id="extendBtn" 
-                    class="action-btn" 
-                    onclick="triggerExtend()" 
-                    disabled>
-                Extend Session (+2m)
-            </button>
-            <button id="pauseBtn" 
-                    class="action-btn" 
-                    onclick="triggerPauseToggle()" 
-                    disabled>
-                Pause Timer
-            </button>
-            <button id="sleepBtn" 
-                    class="danger-btn" 
-                    onclick="triggerSleep()" 
-                    disabled>
-                Deep Sleep
-            </button>
-        </div>
-    </div>
-    <style>
-        /* Lock base page parameters and strip scrollbars */
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            width: 100vw;
-            background: #111827;
-            overflow: hidden;
-        }
-        body {
-            font-family: system-ui, sans-serif;
-            color: #f9fafb;
-            box-sizing: border-box;
-            padding: 1.5vh 3vw;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        /* Status Bar scales proportionally to height */
-        .status-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #1f2937;
-            padding: 1.2vh 4vw;
-            border-radius: 8px;
-            margin-bottom: 1.5vh;
-            font-weight: bold;
-            border-left: 0.6vh solid #ef4444;
-            transition: all 0.3s;
-            font-size: 2vh;
-            flex-shrink: 0;
-            box-sizing: border-box;
-            width: 100%;
-        }
-        .status-bar.connected {
-            border-left-color: #10b981;
-            color: #10b981;
-        }
-        .status-bar.reconnecting {
-            border-left-color: #f59e0b;
-            color: #f59e0b;
-        }
-        .status-text {
-            display: flex;
-            align-items: center;
-            gap: 1vw;
-        }
-        
-        /* Container targets 82vh to clear browser docks */
-        .dashboard {
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 82vh; 
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .temp-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 2vw;
-            flex-shrink: 0;
-        }
-        .card {
-            background: #1f2937;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            box-sizing: border-box;
-            width: 100%;
-        }
-        
-        /* Card height targets mapped to high-res viewports */
-        .temp-card { height: 11vh; padding: 0.5vh; }
-        .battery-card { height: 15vh; padding: 1vh; }
-        .timer-card { height: 13vh; padding: 1vh; }
-        
-        /* Font parameters mapping requested default color schemes */
-        .label {
-            font-size: 1.6vh;
-            text-transform: uppercase;
-            color: #9ca3af;
-            font-weight: 600;
-            letter-spacing: 0.05em;
-        }
-        .max-val {
-            font-size: 3.4vh;
-            color: #f87171; /* Default Max: Red */
-            font-weight: bold;
-            margin-top: 0.5vh;
-        }
-        .cur-val {
-            font-size: 3.4vh;
-            color: #4ade80; /* Default Cur: Green */
-            font-weight: bold;
-            margin-top: 0.5vh;
-            transition: color 0.2s ease;
-        }
-        .min-val {
-            font-size: 3.4vh;
-            color: #38bdf8; /* Default Min: Blue */
-            font-weight: bold;
-            margin-top: 0.5vh;
-        }
-        .bat-val {
-            font-size: 2.4vh;
-            color: #10b981;
-            font-weight: bold;
-            margin-top: 0.5vh;
-            transition: color 0.3s;
-        }
-        .timer-val {
-            color: #a855f7;
-            font-size: 2.4vh;
-            font-weight: bold;
-            margin-top: 0.5vh;
-        }
-        
-        .battery-icon {
-            width: 14vw;
-            height: 4.5vh;
-            border: 0.4vh solid #9ca3af;
-            border-radius: 6px;
-            position: relative;
-            padding: 0.3vh;
-            box-sizing: border-box;
-            margin-top: 1vh;
-        }
-        .battery-icon::after {
-            content: '';
-            position: absolute;
-            right: -1.2vw;
-            top: 1.1vh;
-            width: 0.8vw;
-            height: 1.6vh;
-            background: #9ca3af;
-            border-radius: 0 3px 3px 0;
-        }
-        .battery-level {
-            height: 100%;
-            width: 0%;
-            background: #10b981;
-            border-radius: 2px;
-            transition: width 0.5s;
-        }
-        
-        /* Action groups configuration */
-        .actions-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.8vh;
-            flex-shrink: 0;
-        }
-        button {
-            width: 100%;
-            height: 5.5vh;
-            font-size: 2vh;
-            border-radius: 8px;
-            cursor: pointer;
-            border: none;
-            font-weight: 600;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            box-sizing: border-box;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        button:disabled {
-            background: #374151 !important;
-            color: #9ca3af;
-            cursor: not-allowed;
-        }
-        .hdr-btn {
-            width: auto;
-            height: auto;
-            padding: 0.6vh 3vw;
-            font-size: 1.8vh;
-            border-radius: 6px;
-            color: white;
-            box-shadow: none;
-        }
-        .ctl-btn { background: #2563eb; }
-        .disc-btn { background: #d97706; }
-        .action-btn { background: #4b5563; color: white; width: 100%; }
-        .danger-btn { background: #dc2626; color: white; width: 100%; }
-    </style>
-    <script>
-        let gattServer = null;
-        let device = null;
-        let recon = false;
-        
-        let connectStartTime = null;
-        let timerIntervalId = null;
-        let localTimerPaused = false;
-        let accumulatedElapsedMs = 0;
-        
-        // Cache to store the latest raw numerical temperature states
-        let lastKnownTemps = { max: null, cur: null, min: null };
-        
-        const svcUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const delay = 15000;
-
-        const UUID_MAX  = "4fafc203-1fb5-459e-8fcc-c5c9c331914b";
-        const UUID_CUR  = "4fafc202-1fb5-459e-8fcc-c5c9c331914b";
-        const UUID_MIN  = "4fafc204-1fb5-459e-8fcc-c5c9c331914b";
-        const UUID_BAT  = "4fafc206-1fb5-459e-8fcc-c5c9c331914b";
-        const UUID_RST  = "4fafc205-1fb5-459e-8fcc-c5c9c331914b";
-        const UUID_SLP  = "4fafc207-1fb5-459e-8fcc-c5c9c331914b";
-        const UUID_EXT  = "4fafc208-1fb5-459e-8fcc-c5c9c331914b";
-        const UUID_PSE  = "4fafc209-1fb5-459e-8fcc-c5c9c331914b";
-        
-        function updateTimerDisplay() {
-            if (!connectStartTime) return;
-            
-            let elapsedMs = accumulatedElapsedMs;
-            if (!localTimerPaused) {
-                elapsedMs += Date.now() - connectStartTime;
-            }
-            
-            const totalSecs = Math.floor(elapsedMs / 1000);
-            const secs = String(totalSecs % 60).padStart(2, '0');
-            const mins = String(Math.floor(totalSecs / 60) % 60)
-                                .padStart(2, '0');
-            const hrs  = String(Math.floor(totalSecs / 3600))
-                                .padStart(2, '0');
-            
-            document.getElementById('elapsedTime').innerText = 
-                `${hrs}:${mins}:${secs}`;
-        }
-
-        function startSessionTimer() {
-            stopSessionTimer(); 
-            connectStartTime = Date.now();
-            accumulatedElapsedMs = 0;
-            localTimerPaused = false;
-            document.getElementById('pauseBtn').innerText = 
-                "Pause Timer";
-            timerIntervalId = setInterval(updateTimerDisplay, 1000);
-            updateTimerDisplay();
-        }
-
-        function stopSessionTimer() {
-            if (timerIntervalId) {
-                clearInterval(timerIntervalId);
-                timerIntervalId = null;
-            }
-        }
-        
-        // Handles conditional matching for cur-val text colors
-        function evaluateCurrentTempColor() {
-            const curEl = document.getElementById('cur');
-            if (!curEl || lastKnownTemps.cur === null) return;
-            
-            if (lastKnownTemps.cur === lastKnownTemps.max) {
-                curEl.style.color = "#f87171"; // Match Max: Red
-            } else if (lastKnownTemps.cur === lastKnownTemps.min) {
-                curEl.style.color = "#38bdf8"; // Match Min: Blue
-            } else {
-                curEl.style.color = "#4ade80"; // Default: Green
-            }
-        }
-        
-        function updateBatteryUI(v) {
-            if (v <= 3.1) {
-                console.warn("Critical Battery Voltage (<=3.1V)! Sleeping.");
-                triggerSleep();
-                return;
-            }
-
-            let num = ((v - 3.1) / 1.1) * 100;
-            let p = Math.max(0, Math.min(100, Math.round(num)));
-            const el = document.getElementById('batLevel');
-            const val = document.getElementById('bat');
-            
-            el.style.width = p + '%';
-            
-            let col = '#ef4444'; 
-            if (v > 3.65) {
-                col = '#10b981'; 
-            } else if (v > 3.40) {
-                col = '#f59e0b'; 
-            }
-            el.style.backgroundColor = val.style.color = col;
-        }
-        
-        function onDisconnected() {
-            document.getElementById('resetBtn').disabled = true;
-            document.getElementById('extendBtn').disabled = true;
-            document.getElementById('pauseBtn').disabled = true;
-            document.getElementById('sleepBtn').disabled = true;
-            
-            const sb = document.getElementById('statusBar');
-            const st = document.getElementById('statusText');
-            const btn = document.getElementById('toggleBtn');
-            
-            stopSessionTimer(); 
-            
-            if (recon) {
-                st.innerText = "🟡 Connection Lost";
-                sb.className = "status-bar reconnecting";
-                btn.innerText = "Connect";
-                btn.className = "hdr-btn ctl-btn";
-                btn.disabled = false;
-                setTimeout(attemptReconnect, delay);
-            } else {
-                st.innerText = "🔴 Disconnected";
-                sb.className = "status-bar";
-                btn.innerText = "Connect";
-                btn.className = "hdr-btn ctl-btn";
-                btn.disabled = false;
-                clearDisplay();
-            }
-        }
-        function toggleConnection() {
-            const btn = document.getElementById('toggleBtn');
-            if (device && device.gatt.connected) {
-                recon = false;
-                btn.disabled = true;
-                device.gatt.disconnect();
-            } else {
-                connectBLE();
-            }
-        }
-        
-        function clearDisplay() {
-            document.getElementById('max').innerText = "--.- °C";
-            document.getElementById('cur').innerText = "--.- °C";
-            document.getElementById('cur').style.color = "";
-            document.getElementById('min').innerText = "--.- °C";
-            document.getElementById('bat').innerText = "--.- V";
-            document.getElementById('batLevel').style.width = "0%";
-            document.getElementById('elapsedTime').innerText = 
-                "00:00:00";
-            connectStartTime = null;
-            accumulatedElapsedMs = 0;
-            localTimerPaused = false;
-            lastKnownTemps = { max: null, cur: null, min: null };
-        }
-        
-        async function attemptReconnect() {
-            if (!device || !recon) return;
-            try {
-                gattServer = await device.gatt.connect();
-                await startGattOperations();
-            } catch (e) {
-                setTimeout(attemptReconnect, delay);
-            }
-        }
-        
-        async function startGattOperations() {
-            const s = await gattServer.getPrimaryService(svcUuid);
-            const sb = document.getElementById('statusBar');
-            const st = document.getElementById('statusText');
-            const btn = document.getElementById('toggleBtn');
-            
-            st.innerText = "🟢 Connected";
-            sb.className = "status-bar connected";
-            btn.innerText = "Disconnect";
-            btn.className = "hdr-btn disc-btn";
-            btn.disabled = false;
-            
-            document.getElementById('resetBtn').disabled = false;
-            document.getElementById('extendBtn').disabled = false;
-            document.getElementById('pauseBtn').disabled = false;
-            document.getElementById('sleepBtn').disabled = false;
-            
-            if (!localTimerPaused && accumulatedElapsedMs === 0) {
-                startSessionTimer();
-            } else if (localTimerPaused) {
-                timerIntervalId = setInterval(updateTimerDisplay, 1000);
-            } else {
-                connectStartTime = Date.now();
-                timerIntervalId = setInterval(updateTimerDisplay, 1000);
-            }
-            
-            await setupNotification(s, UUID_MAX, 'max', ' °C', 'max');
-            await setupNotification(s, UUID_CUR, 'cur', ' °C', 'cur');
-            await setupNotification(s, UUID_MIN, 'min', ' °C', 'min');
-            await setupNotification(s, UUID_BAT, 'bat', ' V', 'bat');
-        }
-        
-        async function setupNotification(svc, uuid, id, u, metricKey) {
-            try {
-                const c = await svc.getCharacteristic(uuid);
-                await c.startNotifications();
-                
-                const init = await c.readValue();
-                let txt = new TextDecoder().decode(init);
-                
-                if (metricKey !== 'bat' && !isNaN(parseFloat(txt))) {
-                    let parsedNum = parseFloat(txt);
-                    lastKnownTemps[metricKey] = parseFloat(parsedNum.toFixed(1));
-                    txt = parsedNum.toFixed(1);
-                }
-                
-                document.getElementById(id).innerText = txt + u;
-                if (metricKey === 'bat') updateBatteryUI(parseFloat(txt));
-                evaluateCurrentTempColor();
-                
-                c.addEventListener('characteristicvaluechanged', (e) => {
-                    let d = e.target.value;
-                    let str = new TextDecoder().decode(d);
-                    
-                    if (metricKey !== 'bat' && !isNaN(parseFloat(str))) {
-                        let parsedNum = parseFloat(str);
-                        lastKnownTemps[metricKey] = parseFloat(parsedNum.toFixed(1));
-                        str = parsedNum.toFixed(1);
-                    }
-                    
-                    document.getElementById(id).innerText = str + u;
-                    if (metricKey === 'bat') updateBatteryUI(parseFloat(str));
-                    evaluateCurrentTempColor();
-                });
-            } catch (err) {
-                console.error(err);
-            }
-        }
-        
-        async function connectBLE() {
-            try {
-                recon = false;
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'XIAO_C6_Thermometer' }],
-                    optionalServices: [svcUuid]
-                });
-                let ev = 'gattserverdisconnected';
-                device.addEventListener(ev, onDisconnected);
-                document.getElementById('toggleBtn').disabled = true;
-                gattServer = await device.gatt.connect();
-                recon = true;
-                await startGattOperations();
-            } catch (err) {
-                alert("Connection failed.");
-                document.getElementById('toggleBtn').disabled = false;
-            }
-        }
-        
-        async function writeCommand(uuid, rawPayload = '1') {
-            if (!gattServer || !gattServer.connected) return;
-            try {
-                const s = await gattServer.getPrimaryService(svcUuid);
-                const c = await s.getCharacteristic(uuid);
-                
-                if (uuid === UUID_SLP) recon = false;
-                
-                await c.writeValue(new TextEncoder()
-                                   .encode(rawPayload));
-                
-                if (uuid === UUID_RST) startSessionTimer(); 
-            } catch (e) {
-                console.error(e);
-            }
-        }
-
-        function triggerReset() { writeCommand(UUID_RST, '1'); }
-        function triggerSleep() { writeCommand(UUID_SLP, '1'); }
-        function triggerExtend() { writeCommand(UUID_EXT, '1'); }
-        
-        function triggerPauseToggle() {
-            const btn = document.getElementById('pauseBtn');
-            if (!localTimerPaused) {
-                localTimerPaused = true;
-                accumulatedElapsedMs += Date.now() - connectStartTime;
-                btn.innerText = "Resume Timer";
-                writeCommand(UUID_PSE, '1');
-            } else {
-                localTimerPaused = false;
-                connectStartTime = Date.now();
-                btn.innerText = "Pause Timer";
-                writeCommand(UUID_PSE, '0');
-            }
-            updateTimerDisplay();
-        }
-    </script>
+ <div id="statusBar" class="status-bar">
+ <span id="statusText" class="status-text">Disconnected</span>
+ <button id="toggleBtn" class="hdr-btn ctl-btn" onclick="toggleConnection()">Connect</button>
+ </div>
+ <div class="dashboard">
+ <div class="temp-row">
+ <div class="card temp-card">
+ <div class="label">Max Temp</div>
+ <div class="max-val" id="max">--.- °C</div>
+ </div>
+ <div class="card temp-card">
+ <div class="label">Current</div>
+ <div class="cur-val" id="cur">--.- °C</div>
+ </div>
+ <div class="card temp-card">
+ <div class="label">Min Temp</div>
+ <div class="min-val" id="min">--.- °C</div>
+ </div>
+ </div>
+ <div class="card battery-card">
+ <div class="label">Battery Voltage</div>
+ <div class="val bat-val" id="bat">--.- V</div>
+ <div class="battery-icon">
+ <div id="batLevel" class="battery-level"></div>
+ </div>
+ </div>
+ <div class="card timer-card">
+ <div class="label">Session Elapsed Time</div>
+ <div class="val timer-val" id="elapsedTime">00:00:00</div>
+ </div>
+ <div class="actions-group">
+ <button id="resetBtn" class="action-btn" onclick="triggerReset()" disabled>Reset Metrics</button>
+ <button id="extendBtn" class="action-btn" onclick="triggerExtend()" disabled>Extend Session (+2m)</button>
+ <button id="pauseBtn" class="action-btn" onclick="triggerPauseToggle()" disabled>Pause Timer</button>
+ <button id="sleepBtn" class="danger-btn" onclick="triggerSleep()" disabled>Deep Sleep</button>
+ </div>
+ </div>
+ <style>
+ html, body { margin: 0; padding: 0; height: 100vh; width: 100vw; background: #111827; overflow: hidden; }
+ body { font-family: system-ui, sans-serif; color: #f9fafb; box-sizing: border-box; padding: 1.5vh 3vw; display: flex; flex-direction: column; }
+ .status-bar { display: flex; align-items: center; justify-content: space-between; background: #1f2937; padding: 1.2vh 4vw; border-radius: 8px; margin-bottom: 1.5vh; font-weight: bold; border-left: 0.6vh solid #ef4444; transition: all 0.3s; font-size: 2vh; flex-shrink: 0; box-sizing: border-box; width: 100%; }
+ .status-bar.connected { border-left-color: #10b981; color: #10b981; }
+ .status-bar.reconnecting { border-left-color: #f59e0b; color: #f59e0b; }
+ .status-text { display: flex; align-items: center; gap: 1vw; }
+ .dashboard { display: flex; flex-direction: column; justify-content: space-between; height: 82vh; width: 100%; box-sizing: border-box; }
+ .temp-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2vw; flex-shrink: 0; }
+ .card { background: #1f2937; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; box-sizing: border-box; width: 100%; }
+ .temp-card { height: 11vh; padding: 0.5vh; }
+ .battery-card { height: 15vh; padding: 1vh; }
+ .timer-card { height: 13vh; padding: 1vh; }
+ .label { font-size: 1.6vh; text-transform: uppercase; color: #9ca3af; font-weight: 600; letter-spacing: 0.05em; }
+ .max-val { font-size: 3.4vh; color: #f87171; font-weight: bold; margin-top: 0.5vh; }
+ .cur-val { font-size: 3.4vh; color: #4ade80; font-weight: bold; margin-top: 0.5vh; transition: color 0.2s ease; }
+ .min-val { font-size: 3.4vh; color: #38bdf8; font-weight: bold; margin-top: 0.5vh; }
+ .bat-val { font-size: 2.4vh; color: #10b981; font-weight: bold; margin-top: 0.5vh; transition: color 0.3s; }
+ .timer-val { color: #a855f7; font-size: 2.4vh; font-weight: bold; margin-top: 0.5vh; }
+ .battery-icon { width: 14vw; height: 4.5vh; border: 0.4vh solid #9ca3af; border-radius: 6px; position: relative; padding: 0.3vh; box-sizing: border-box; margin-top: 1vh; }
+ .battery-icon::after { content: ''; position: absolute; right: -1.2vw; top: 1.1vh; width: 0.8vw; height: 1.6vh; background: #9ca3af; border-radius: 0 3px 3px 0; }
+ .battery-level { height: 100%; width: 0%; background: #10b981; border-radius: 2px; transition: width 0.5s; }
+ .actions-group { display: flex; flex-direction: column; gap: 0.8vh; flex-shrink: 0; }
+ button { width: 100%; height: 5.5vh; font-size: 2vh; border-radius: 8px; cursor: pointer; border: none; font-weight: 600; box-shadow: 0 4px 6px rgba(0,0,0,0.1); box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+ button:disabled { background: #374151 !important; color: #9ca3af; cursor: not-allowed; }
+ .hdr-btn { width: auto; height: auto; padding: 0.6vh 3vw; font-size: 1.8vh; border-radius: 6px; color: white; box-shadow: none; }
+ .ctl-btn { background: #2563eb; }
+ .disc-btn { background: #d97706; }
+ .action-btn { background: #4b5563; color: white; width: 100%; }
+ .danger-btn { background: #dc2626; color: white; width: 100%; }
+ </style>
+ <script>
+ let gattServer = null;
+ let device = null;
+ let recon = false;
+ let connectStartTime = null;
+ let timerIntervalId = null;
+ let localTimerPaused = false;
+ let accumulatedElapsedMs = 0;
+ let lastKnownTemps = { max: null, cur: null, min: null };
+ 
+ const svcUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+ const delay = 2500; 
+ 
+ const UUID_MAX = "4fafc203-1fb5-459e-8fcc-c5c9c331914b";
+ const UUID_CUR = "4fafc202-1fb5-459e-8fcc-c5c9c331914b";
+ const UUID_MIN = "4fafc204-1fb5-459e-8fcc-c5c9c331914b";
+ const UUID_BAT = "4fafc206-1fb5-459e-8fcc-c5c9c331914b";
+ const UUID_RST = "4fafc205-1fb5-459e-8fcc-c5c9c331914b";
+ const UUID_SLP = "4fafc207-1fb5-459e-8fcc-c5c9c331914b";
+ const UUID_EXT = "4fafc208-1fb5-459e-8fcc-c5c9c331914b";
+ const UUID_PSE = "4fafc209-1fb5-459e-8fcc-c5c9c331914b";
+ 
+ function updateTimerDisplay() {
+   if (!connectStartTime) return;
+   let elapsedMs = accumulatedElapsedMs;
+   if (!localTimerPaused) { elapsedMs += Date.now() - connectStartTime; }
+   const totalSecs = Math.floor(elapsedMs / 1000);
+   const secs = String(totalSecs % 60).padStart(2, '0');
+   const mins = String(Math.floor(totalSecs / 60) % 60).padStart(2, '0');
+   const hrs = String(Math.floor(totalSecs / 3600)).padStart(2, '0');
+   document.getElementById('elapsedTime').innerText = `${hrs}:${mins}:${secs}`;
+ }
+ function startSessionTimer() {
+   stopSessionTimer(); connectStartTime = Date.now(); accumulatedElapsedMs = 0; localTimerPaused = false;
+   document.getElementById('pauseBtn').innerText = "Pause Timer";
+   timerIntervalId = setInterval(updateTimerDisplay, 1000); updateTimerDisplay();
+ }
+ function stopSessionTimer() { if (timerIntervalId) { clearInterval(timerIntervalId); timerIntervalId = null; } }
+ function evaluateCurrentTempColor() {
+   const curEl = document.getElementById('cur'); if (!curEl || lastKnownTemps.cur === null) return;
+   if (lastKnownTemps.cur === lastKnownTemps.max) { curEl.style.color = "#f87171"; } 
+   else if (lastKnownTemps.cur === lastKnownTemps.min) { curEl.style.color = "#38bdf8"; } 
+   else { curEl.style.color = "#4ade80"; }
+ }
+ function updateBatteryUI(v) {
+   if (v <= 3.1) { console.warn("Critical Battery! Sleeping."); triggerSleep(); return; }
+   let p = Math.max(0, Math.min(100, Math.round(((v - 3.1) / 1.1) * 100)));
+   const el = document.getElementById('batLevel'); const val = document.getElementById('bat');
+   el.style.width = p + '%'; let col = '#ef4444'; 
+   if (v > 3.65) { col = '#10b981'; } else if (v > 3.40) { col = '#f59e0b'; }
+   el.style.backgroundColor = val.style.color = col;
+ }
+ function clearDisplay() {
+   document.getElementById('max').innerText = "--.- °C"; document.getElementById('cur').innerText = "--.- °C"; document.getElementById('cur').style.color = "";
+   document.getElementById('min').innerText = "--.- °C"; document.getElementById('bat').innerText = "--.- V"; document.getElementById('batLevel').style.width = "0%";
+   document.getElementById('elapsedTime').innerText = "00:00:00"; connectStartTime = null; accumulatedElapsedMs = 0; localTimerPaused = false;
+   lastKnownTemps = { max: null, cur: null, min: null };
+ }
+ function onDisconnected() {
+   document.getElementById('resetBtn').disabled = true; document.getElementById('extendBtn').disabled = true;
+   document.getElementById('pauseBtn').disabled = true; document.getElementById('sleepBtn').disabled = true;
+   const sb = document.getElementById('statusBar'); const st = document.getElementById('statusText'); const btn = document.getElementById('toggleBtn');
+   stopSessionTimer(); gattServer = null; 
+   if (recon) {
+     st.innerText = " Connection Lost"; sb.className = "status-bar reconnecting";
+     btn.innerText = "Connect"; btn.className = "hdr-btn ctl-btn"; btn.disabled = false;
+     setTimeout(attemptReconnect, delay);
+   } else {
+     st.innerText = " Disconnected"; sb.className = "status-bar"; btn.innerText = "Connect";
+     btn.className = "hdr-btn ctl-btn"; btn.disabled = false; clearDisplay();
+   }
+ }
+ function toggleConnection() {
+   const btn = document.getElementById('toggleBtn');
+   if (device && device.gatt.connected) { recon = false; btn.disabled = true; device.gatt.disconnect(); } 
+   else { connectBLE(); }
+ }
+ async function attemptReconnect() {
+   if (!device || !recon) return;
+   try { gattServer = await device.gatt.connect(); await startGattOperations(); } 
+   catch (e) { setTimeout(attemptReconnect, delay); }
+ }
+ async function startGattOperations() {
+   const s = await gattServer.getPrimaryService(svcUuid);
+   const sb = document.getElementById('statusBar'); const st = document.getElementById('statusText'); const btn = document.getElementById('toggleBtn');
+   st.innerText = " Connected"; sb.className = "status-bar connected"; btn.innerText = "Disconnect"; btn.className = "hdr-btn disc-btn"; btn.disabled = false;
+   document.getElementById('resetBtn').disabled = false; document.getElementById('extendBtn').disabled = false;
+   document.getElementById('pauseBtn').disabled = false; document.getElementById('sleepBtn').disabled = false;
+   if (!localTimerPaused && accumulatedElapsedMs === 0) { startSessionTimer(); } 
+   else if (localTimerPaused) { timerIntervalId = setInterval(updateTimerDisplay, 1000); } 
+   else { connectStartTime = Date.now(); timerIntervalId = setInterval(updateTimerDisplay, 1000); }
+   await Promise.all([
+     setupNotification(s, UUID_MAX, 'max', ' °C', 'max'),
+     setupNotification(s, UUID_CUR, 'cur', ' °C', 'cur'),
+     setupNotification(s, UUID_MIN, 'min', ' °C', 'min'),
+     setupNotification(s, UUID_BAT, 'bat', ' V', 'bat')
+   ]);
+ }
+ async function setupNotification(svc, uuid, id, u, metricKey) {
+   try {
+     const c = await svc.getCharacteristic(uuid); await c.startNotifications();
+     const init = await c.readValue(); let txt = new TextDecoder().decode(init);
+     if (metricKey !== 'bat' && !isNaN(parseFloat(txt))) {
+       let parsedNum = parseFloat(txt); lastKnownTemps[metricKey] = parseFloat(parsedNum.toFixed(1)); txt = parsedNum.toFixed(1);
+     }
+     document.getElementById(id).innerText = txt + u;
+     if (metricKey === 'bat') updateBatteryUI(parseFloat(txt));
+     evaluateCurrentTempColor();
+     c.addEventListener('characteristicvaluechanged', (e) => {
+       let d = e.target.value; let str = new TextDecoder().decode(d);
+       if (metricKey !== 'bat' && !isNaN(parseFloat(str))) {
+         let parsedNum = parseFloat(str); lastKnownTemps[metricKey] = parseFloat(parsedNum.toFixed(1)); str = parsedNum.toFixed(1);
+       }
+       document.getElementById(id).innerText = str + u;
+       if (metricKey === 'bat') updateBatteryUI(parseFloat(str));
+       evaluateCurrentTempColor();
+     });
+   } catch (err) { console.error(err); }
+ }
+ 
+ // FIX: Configured open device list catcher targeted specifically to our custom optional telemetry service 
+ async function connectBLE() {
+   try {
+     recon = false;
+     device = await navigator.bluetooth.requestDevice({
+       acceptAllDevices: true,
+       optionalServices: [svcUuid]
+     });
+     device.addEventListener('gattserverdisconnected', onDisconnected);
+     document.getElementById('toggleBtn').disabled = true;
+     gattServer = await device.gatt.connect();
+     recon = true;
+     await startGattOperations();
+   } catch (err) {
+     alert("Connection failed: " + err.message);
+     document.getElementById('toggleBtn').disabled = false;
+   }
+ }
+ async function writeCommand(uuid, rawPayload = '1') {
+   if (!gattServer || !gattServer.connected) return;
+   try {
+     const s = await gattServer.getPrimaryService(svcUuid); const c = await s.getCharacteristic(uuid);
+     if (uuid === UUID_SLP) recon = false;
+     await c.writeValue(new TextEncoder().encode(rawPayload));
+     if (uuid === UUID_RST) startSessionTimer(); 
+   } catch (e) { console.error(e); }
+ }
+ function triggerReset() { writeCommand(UUID_RST, '1'); }
+ function triggerSleep() { writeCommand(UUID_SLP, '1'); }
+ function triggerExtend() { writeCommand(UUID_EXT, '1'); }
+ function triggerPauseToggle() {
+   const btn = document.getElementById('pauseBtn');
+   if (!localTimerPaused) {
+     localTimerPaused = true; accumulatedElapsedMs += Date.now() - connectStartTime; btn.innerText = "Resume Timer"; writeCommand(UUID_PSE, '1');
+   } else {
+     localTimerPaused = false; connectStartTime = Date.now(); btn.innerText = "Pause Timer"; writeCommand(UUID_PSE, '0');
+   }
+   updateTimerDisplay();
+ }
+ </script>
 </body>
 </html>
