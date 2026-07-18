@@ -16,7 +16,178 @@
  <div class="label">Max Temp</div>
  <div class="max-val" id="max">--.- °C</div>
  </div>
- <div class="card temp-card">
+ <div class="card temp-card">    function onDisconnected() {
+        document.getElementById('resetBtn').disabled = true;
+        document.getElementById('extendBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('sleepBtn').disabled = true;
+    
+        const sb = document.getElementById('statusBar');
+        const st = document.getElementById('statusText');
+        const btn = document.getElementById('toggleBtn');
+    
+        stopSessionTimer(); 
+    
+        if (recon) {
+            st.innerText = " Connection Lost";
+            sb.className = "status-bar reconnecting";
+            btn.innerText = "Connect";
+            btn.className = "hdr-btn ctl-btn";
+            btn.disabled = false;
+            setTimeout(attemptReconnect, delay);
+        } else {
+            st.innerText = " Disconnected";
+            sb.className = "status-bar";
+            btn.innerText = "Connect";
+            btn.className = "hdr-btn ctl-btn";
+            btn.disabled = false;
+            clearDisplay();
+        }
+    }
+
+    function toggleConnection() {
+        const btn = document.getElementById('toggleBtn');
+        if (device && device.gatt.connected) {
+            recon = false;
+            btn.disabled = true;
+            device.gatt.disconnect();
+        } else {
+            connectBLE();
+        }
+    }
+    
+    async function attemptReconnect() {
+        if (!device || !recon) return;
+        try {
+            gattServer = await device.gatt.connect();
+            await startGattOperations();
+        } catch (e) {
+            setTimeout(attemptReconnect, delay);
+        }
+    }
+    
+    async function startGattOperations() {
+        const s = await gattServer.getPrimaryService(svcUuid);
+        const sb = document.getElementById('statusBar');
+        const st = document.getElementById('statusText');
+        const btn = document.getElementById('toggleBtn');
+    
+        st.innerText = " Connected";
+        sb.className = "status-bar connected";
+        btn.innerText = "Disconnect";
+        btn.className = "hdr-btn disc-btn";
+        btn.disabled = false;
+    
+        document.getElementById('resetBtn').disabled = false;
+        document.getElementById('extendBtn').disabled = false;
+        document.getElementById('pauseBtn').disabled = false;
+        document.getElementById('sleepBtn').disabled = false;
+    
+        if (!localTimerPaused && accumulatedElapsedMs === 0) {
+            startSessionTimer();
+        } else if (localTimerPaused) {
+            timerIntervalId = setInterval(updateTimerDisplay, 1000);
+        } else {
+            connectStartTime = Date.now();
+            timerIntervalId = setInterval(updateTimerDisplay, 1000);
+        }
+    
+        await setupNotification(s, UUID_MAX, 'max', ' °C', 'max');
+        await setupNotification(s, UUID_CUR, 'cur', ' °C', 'cur');
+        await setupNotification(s, UUID_MIN, 'min', ' °C', 'min');
+        await setupNotification(s, UUID_BAT, 'bat', ' V', 'bat');
+    }
+    
+    async function setupNotification(svc, uuid, id, u, metricKey) {
+        try {
+            const c = await svc.getCharacteristic(uuid);
+            await c.startNotifications();
+            
+            const init = await c.readValue();
+            let txt = new TextDecoder().decode(init);
+            
+            if (metricKey !== 'bat' && !isNaN(parseFloat(txt))) {
+                let parsedNum = parseFloat(txt);
+                lastKnownTemps[metricKey] = parseFloat(parsedNum.toFixed(1));
+                txt = parsedNum.toFixed(1);
+            }
+            
+            document.getElementById(id).innerText = txt + u;
+            if (metricKey === 'bat') updateBatteryUI(parseFloat(txt));
+            evaluateCurrentTempColor();
+            
+            c.addEventListener('characteristicvaluechanged', (e) => {
+                let d = e.target.value;
+                let str = new TextDecoder().decode(d);
+                if (metricKey !== 'bat' && !isNaN(parseFloat(str))) {
+                    let parsedNum = parseFloat(str);
+                    lastKnownTemps[metricKey] = parseFloat(parsedNum.toFixed(1));
+                    str = parsedNum.toFixed(1);
+                }
+                document.getElementById(id).innerText = str + u;
+                if (metricKey === 'bat') updateBatteryUI(parseFloat(str));
+                evaluateCurrentTempColor();
+            });
+        } catch (err) {
+            console.error(err);
+        }
+    }
+    
+    // ORIGINAL FILTER MECHANICS: Hardcoded string filtering for standard mixed-case target
+    async function connectBLE() {
+        try {
+            recon = false;
+            device = await navigator.bluetooth.requestDevice({
+                filters: [{ name: 'XIAO_C6_Thermometer' }],
+                optionalServices: [svcUuid]
+            });
+            device.addEventListener('gattserverdisconnected', onDisconnected);
+            document.getElementById('toggleBtn').disabled = true;
+            gattServer = await device.gatt.connect();
+            recon = true;
+            await startGattOperations();
+        } catch (err) {
+            alert("Connection failed.");
+            document.getElementById('toggleBtn').disabled = false;
+        }
+    }
+    
+    async function writeCommand(uuid, rawPayload = '1') {
+        if (!gattServer || !gattServer.connected) return;
+        try {
+            const s = await gattServer.getPrimaryService(svcUuid);
+            const c = await s.getCharacteristic(uuid);
+            if (uuid === UUID_SLP) recon = false;
+            await c.writeValue(new TextEncoder().encode(rawPayload));
+            if (uuid === UUID_RST) startSessionTimer(); 
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function triggerReset() { writeCommand(UUID_RST, '1'); }
+    function triggerSleep() { writeCommand(UUID_SLP, '1'); }
+    function triggerExtend() { writeCommand(UUID_EXT, '1'); }
+    
+    function triggerPauseToggle() {
+        const btn = document.getElementById('pauseBtn');
+        if (!localTimerPaused) {
+            localTimerPaused = true;
+            accumulatedElapsedMs += Date.now() - connectStartTime;
+            btn.innerText = "Resume Timer";
+            writeCommand(UUID_PSE, '1');
+        } else {
+            localTimerPaused = false;
+            connectStartTime = Date.now();
+            btn.innerText = "Pause Timer";
+            writeCommand(UUID_PSE, '0');
+        }
+        updateTimerDisplay();
+    }
+    </script>
+</body>
+</html>
+
  <div class="label">Current</div>
  <div class="cur-val" id="cur">--.- °C</div>
  </div>
